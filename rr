@@ -1,0 +1,17 @@
+#! /bin/bash
+
+source ${rr_home:-$HOME/.rr}/require.sh
+
+args=($*)
+action="${args[0]}"
+shift
+
+case "$action" in
+	list|current|unuse|create|delete|use|info)
+		kcm_$action "$@"
+		;;
+	*)
+		kcm_usage
+		exit 1
+		;;
+esac
