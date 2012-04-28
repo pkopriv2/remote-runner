@@ -2,16 +2,18 @@
 
 source ${rr_home:-$HOME/.rr}/require.sh
 
+require "key.sh"
+require "client.sh"
+
 args=($*)
 action="${args[0]}"
 shift
 
 case "$action" in
-	list|current|unuse|create|delete|use|info)
-		kcm_$action "$@"
+	key|client)
+		"$action"_action "$@"
 		;;
 	*)
-		kcm_usage
 		exit 1
 		;;
 esac

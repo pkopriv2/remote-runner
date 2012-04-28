@@ -22,3 +22,17 @@ str_is_blank() {
 str_strip_whitespace() {
 	echo $(echo "$1" | sed 's/^\s*//') | sed 's/\s*$//'
 }
+
+# Logs a message out in a friendly green color. 
+#
+log_info() {
+	echo -e "$(tput setaf 2)$1$(tput sgr0)"
+}
+
+# Logs a message out in a unfriendly red color. 
+# The use should clearly know that something
+# has gone wrong.
+#
+log_error() {
+	echo -e "$(tput setaf 1)$1$(tput sgr0)"
+}
