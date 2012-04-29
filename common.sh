@@ -23,6 +23,48 @@ str_strip_whitespace() {
 	echo $(echo "$1" | sed 's/^\s*//') | sed 's/\s*$//'
 }
 
+
+# Accepts an auth string and 
+#
+uri() {
+	if [[ "$(expr "$1" : "^[^ ]\+@[^ ]\+$")" != "0" ]]
+	then 
+		echo "$1"
+		exit 0
+	fi 
+
+	echo "root@$1"
+}
+
+# Gets the host portion of a login uri.
+# Login uris follow the pattern: user@host
+#
+uri_get_host() {
+	expr "$1" : "@\([^ ]\+\)$"
+}
+
+
+# Gets the user portion of a login uri.
+# Login uris follow the pattern: user@host
+#
+uri_get_user() {
+	expr "$1" : "^\([^ ]\+\)@"
+}
+
+# Returns the standard location of a user's
+# home directory.  It is assumed that the root 
+# user's home is always at /root and all other 
+# users' homes are located at /home/$user
+#
+user_get_home() {
+	if [[ "$1" == "root" ]]
+	then
+		echo "/root"
+	else
+		echo "/home/$1"
+	fi
+}
+
 # Logs a message out in a friendly green color. 
 #
 log_info() {
@@ -34,5 +76,5 @@ log_info() {
 # has gone wrong.
 #
 log_error() {
-	echo -e "$(tput setaf 1)$1$(tput sgr0)"
+	echo -e "$(tput setaf 1)$1$(tput sgr0)" >&2
 }

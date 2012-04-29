@@ -31,39 +31,52 @@ client_bootstrap() {
 		exit 1
 	fi
 
-	local key_name=${2:-default}
-	local pub_key=$(key_get "$key_name")
-	local err=$(
-	ssh root@$1 "bash -s" 2>&1 >/dev/null <<EOH
-		if [[ ! -d /root/.ssh ]]
-		then
-			mkdir /root/.ssh
-		fi
-
-		IFS=$'\n'
-		if [[ -f /root/.ssh/authorized_keys ]]
-		then 
-			if grep "$pub_key" /root/.ssh/authorized_keys
-			then
-				echo "Key [$pub_key] already exists"
-				exit 0
-			fi 
-		fi
-
-		echo $pub_key >> /root/.ssh/authorized_keys
-EOH
-)
-
-	if [[ "$err" ]]
+	if ! local uri=$(uri "$1")
 	then
-		log_error "Error bootstrapping client [$1]: $err"
 		exit 1
 	fi
 
-	cat > $rr_host_home/$1.sh <<EOH
+	if ! local user_home=$(user_get_home "$(uri_get_user "$uri")")
+	then
+		exit 1
+	fi
+
+	if ! local pub_key=$(key_get "${2:-default}")
+	then 
+		 exit 1
+	fi
+
+	local err=$(
+	ssh $uri "bash -s" 2>&1 >/dev/null <<EOH
+
+		if [[ ! -d $user_home/.ssh ]]
+		then
+			mkdir $user_home/.ssh
+		fi
+
+		IFS=$'\n'
+		if [[ -f $user_home/.ssh/authorized_keys ]]
+		then 
+			if grep "$pub_key" $user_home/.ssh/authorized_keys
+			then
+				echo "Key already exists" >&2
+				exit 1
+			fi 
+		fi
+
+		echo $pub_key >> $user_home/.ssh/authorized_keys
+EOH
+)
+	if [[ "$err" ]]
+	then
+		log_error "Error bootstrapping client [$uri]: $err"
+		exit 1
+	fi
+
+	cat > $rr_host_home/$uri.sh <<EOH
 #! /bin/bash
 
-key_name=$key_name
+key_name=${2:-default}
 EOH
 }
 
