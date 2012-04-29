@@ -20,6 +20,61 @@ client_list() {
 	done
 }
 
+# Creates the default client file.
+# 
+# @param $1 The full client login of the machine
+# @param $2 The key file to use when logging into this machine.
+#
+_file_bootstrap() {
+	log_info "Creating host file [$1] using key [$2]"
+
+	cat > $rr_host_home/$1.sh <<EOH
+#! /bin/bash
+
+key_name=$2 
+EOH
+}
+
+
+# Copies a public key to the specified host.
+#
+# @param $1 The full client login of the machine.  This is assumed to have been 
+#           normalized, ie of the form (user@host)
+# @param $2 The name of the key to copy.  This is assumed to have been
+#           normalized. (keys are assummed to be of the form: 
+#           id_rsa.<name>.pub).  
+_ssh_bootstrap() {
+	log_info "Copying key [$2] to host [$1]"
+
+	if ! local user_home=$(user_get_home "$(login_get_user "$1")") &> /dev/null
+	then
+		log_error "Unable to determine user home from login [$1]"
+		exit 1
+	fi
+
+	if ! local pub_key=$(key_get "$2") &> /dev/null
+	then 
+		log_error "Unable to determine value of public key [$2]"
+		exit 1
+	fi
+
+	ssh $1 "bash -s" 2>&1 >/dev/null <<EOH
+		if [[ ! -d $user_home/.ssh ]]
+		then
+			mkdir $user_home/.ssh
+		fi
+
+		IFS=$'\n'
+		if [[ -f $user_home/.ssh/authorized_keys ]]
+		then 
+			if ! grep "$pub_key" $user_home/.ssh/authorized_keys
+			then
+				echo $pub_key >> $user_home/.ssh/authorized_keys
+			fi 
+		fi
+EOH
+}
+
 # Copies a public key to the specified host.
 #
 # @param host The hostname/ip of the client to bootstrap
@@ -31,53 +86,20 @@ client_bootstrap() {
 		exit 1
 	fi
 
-	if ! local uri=$(uri "$1")
+	local login=$(login "$1")
+	local key_name=${2:-"default"}
+
+	if ! _ssh_bootstrap "$login" "$key_name"
 	then
+		log_error "Unable to copy ssh keys."
 		exit 1
 	fi
 
-	if ! local user_home=$(user_get_home "$(uri_get_user "$uri")")
+	if ! _file_bootstrap "$login" "$key_name" 
 	then
+		log_error "Unable to bootstrap local host file."
 		exit 1
 	fi
-
-	if ! local pub_key=$(key_get "${2:-default}")
-	then 
-		 exit 1
-	fi
-
-	local err=$(
-	ssh $uri "bash -s" 2>&1 >/dev/null <<EOH
-
-		if [[ ! -d $user_home/.ssh ]]
-		then
-			mkdir $user_home/.ssh
-		fi
-
-		IFS=$'\n'
-		if [[ -f $user_home/.ssh/authorized_keys ]]
-		then 
-			if grep "$pub_key" $user_home/.ssh/authorized_keys
-			then
-				echo "Key already exists" >&2
-				exit 1
-			fi 
-		fi
-
-		echo $pub_key >> $user_home/.ssh/authorized_keys
-EOH
-)
-	if [[ "$err" ]]
-	then
-		log_error "Error bootstrapping client [$uri]: $err"
-		exit 1
-	fi
-
-	cat > $rr_host_home/$uri.sh <<EOH
-#! /bin/bash
-
-key_name=${2:-default}
-EOH
 }
 
 # Reads a command from std in

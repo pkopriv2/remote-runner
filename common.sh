@@ -26,7 +26,7 @@ str_strip_whitespace() {
 
 # Accepts an auth string and 
 #
-uri() {
+login() {
 	if [[ "$(expr "$1" : "^[^ ]\+@[^ ]\+$")" != "0" ]]
 	then 
 		echo "$1"
@@ -36,18 +36,18 @@ uri() {
 	echo "root@$1"
 }
 
-# Gets the host portion of a login uri.
-# Login uris follow the pattern: user@host
+# Gets the host portion of a login login.
+# Login logins follow the pattern: user@host
 #
-uri_get_host() {
+login_get_host() {
 	expr "$1" : "@\([^ ]\+\)$"
 }
 
 
-# Gets the user portion of a login uri.
-# Login uris follow the pattern: user@host
+# Gets the user portion of a login login.
+# Login logins follow the pattern: user@host
 #
-uri_get_user() {
+login_get_user() {
 	expr "$1" : "^\([^ ]\+\)@"
 }
 
