@@ -46,13 +46,13 @@ EOH
 _ssh_bootstrap() {
 	log_info "Copying key [$2] to host [$1]"
 
-	if ! local user_home=$(user_get_home "$(login_get_user "$1")") &> /dev/null
+	if ! local user_home=$(user_get_home "$(login_get_user "$1")" &> /dev/null) 
 	then
 		log_error "Unable to determine user home from login [$1]"
 		exit 1
 	fi
 
-	if ! local pub_key=$(key_get "$2") &> /dev/null
+	if ! local pub_key=$(key_get "$2" &> /dev/null)
 	then 
 		log_error "Unable to determine value of public key [$2]"
 		exit 1
@@ -110,21 +110,60 @@ client_execute() {
 		log_error "Must provide a hostname."
 		exit 1
 	fi
+	
+	local login=$(login "$1")
 
-	local host_file=$rr_host_home/$1.sh
-	if [[ ! -f $host_file  ]]
+	if ! source $rr_host_home/$login.sh
 	then
-		log_error "Client [$1] has not been bootstrapped"
+		log_error "Client [$login] has not been bootstrapped"
 		exit 1
 	fi
 
-	source $host_file
 	local key_file=$rr_key_home/id_rsa.$key_name
 
-	{
-		cat $host_file
-		cat $2
-	} | ssh -i $key_file root@$1 "bash -s"
+	if [[ $# == 1 ]]
+	then
+		ssh -i "$key_file" $login "bash -s" 
+		exit $?
+	fi
+
+	if [[ ! -f $2 ]] 
+	then
+		log_error "Unable to locate file [$2]"
+		exit 1
+	fi
+
+    {
+cat $rr_host_home/$login.sh
+cat $rr_home/common.sh
+cat $rr_home/lib/lib.sh
+cat $rr_home/lib/user.sh
+cat $2
+	} | ssh -t -i $key_file $login "bash -s"
+}
+
+# Show the details of the client.
+#
+client_show() {
+	if [[ $# != 1 ]]
+	then
+		log_error "Must provide a login"
+		exit 1
+	fi
+
+	local login=$(login "$1")
+	if [[ ! -f $rr_host_home/$login.sh ]] 
+	then
+		log_error "That client [$login] has not been bootstrapped"
+		exit 1
+	fi
+
+	local host=$(login_get_host "$login")
+	local ip=$(host_get_ip "$host")
+
+	log_info "$login: $ip"
+	echo 
+	cat $rr_host_home/$login.sh | grep '^[^#]'
 }
 
 client_action() {
@@ -133,7 +172,7 @@ client_action() {
 	unset args[0]
 
 	case "$action" in
-		list|bootstrap|execute)
+		list|bootstrap|execute|show)
 			client_$action "${args[@]}"
 			;;
 		*)

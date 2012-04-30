@@ -40,7 +40,7 @@ login() {
 # Login logins follow the pattern: user@host
 #
 login_get_host() {
-	expr "$1" : "@\([^ ]\+\)$"
+	expr "$1" : "^[^ ]\+@\([^ ]\+\)$"
 }
 
 
@@ -51,19 +51,18 @@ login_get_user() {
 	expr "$1" : "^\([^ ]\+\)@"
 }
 
-# Returns the standard location of a user's
-# home directory.  It is assumed that the root 
-# user's home is always at /root and all other 
-# users' homes are located at /home/$user
-#
-user_get_home() {
-	if [[ "$1" == "root" ]]
-	then
-		echo "/root"
-	else
-		echo "/home/$1"
-	fi
+# Gets the ip of the host.  Expecting the output of
+# the host command to be:
+#  	pkopriv2-fileserver has address 192.168.100.3
+# 
+host_get_ip() {
+	expr "$(host $1)" : "^$1 has address \(.*\)$"
 }
+
+user_get_home() {
+	echo ~$1
+}
+
 
 # Logs a message out in a friendly green color. 
 #
