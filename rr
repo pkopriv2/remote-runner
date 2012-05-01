@@ -1,19 +1,115 @@
 #! /bin/bash
 
-source ${rr_home:-$HOME/.rr}/require.sh
+export rr_home
+export rr_host_home
 
+rr_home=${rr_home:-$HOME/.rr}
+rr_host_home=${rr_host_home:-$rr_home/hosts}
+
+source $rr_home/require.sh
+
+require "lib/login.sh"
+require "lib/log.sh"
+require "host.sh"
 require "key.sh"
-require "client.sh"
+
+#IFS=$'\n'
+
+execute() {
+	_ssh_lib() {
+		for script in $rr_home/lib/*.sh
+		do
+			cat $script
+		done
+
+		for script in $rr_home/dsl/*.sh
+		do
+			cat $script
+		done
+		
+		cat "$rr_host_home/$login.sh"
+	}
+
+	_ssh() {
+		{ 
+			echo "$(_ssh_lib)"
+			cat $3
+		} | ssh -t -i $2 $1 "bash -s"
+	}
+
+	_ssh_sudo() {
+		log_error "Undefined"
+		#printf "%s" "[sudo] password for $USER:"
+		#read -s password
+
+		#echo "$password"
+		#{ 
+			#echo "$password"
+			#echo "$(_ssh_lib)"
+			#cat $3
+		#} | ssh -t -i $2 $1 "sudo -S bash -s"
+	}
+
+	if [[ $# < 1 ]]
+	then
+		log_error "Not enough arguments."
+		exit 1
+	fi
+
+	if [[ "$1" == "sudo" ]]
+	then
+		local login=$2
+		local script=$3
+	else
+		local login=$1
+		local script=$2
+	fi 
+
+	if [[ ! -f $script ]] 
+	then
+		log_error "Unable to locate file [$script]"
+		exit 1
+	fi
+	
+	local login=$(login "$login")
+	if ! source $rr_host_home/$login.sh
+	then
+		log_error "Error sourcing client file [$login]."
+		exit 1
+	fi
+
+	local key_file=$rr_key_home/id_rsa.${key_name:-"default"}
+	if [[ ! -f $key_file ]] 
+	then 
+		log_error "That key file [$key_file] doesn't exist"
+		exit 1
+	fi
+
+	if [[ "$1" == "sudo" ]]
+	then
+		_ssh_sudo "$login" "$key_file" "$script"
+	else
+		_ssh "$login" "$key_file" "$script"
+	fi
+}
+
+help() {
+	log_error "Undefined"
+}
+
 
 args=($*)
 action="${args[0]}"
 shift
 
 case "$action" in
-	key|client)
+	key|host)
 		"$action"_action "$@"
 		;;
+	help)
+		help
+		;;	
 	*)
-		exit 1
+		execute "${args[@]}" 
 		;;
 esac

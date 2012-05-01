@@ -1,6 +1,7 @@
 #! /bin/bash
 
-require "common.sh"
+require "lib/log.sh"
+require "lib/dir.sh"
 
 rr_key_home=${rr_key_home:-$rr_home/keys}
 dir_create_if_missing "$rr_key_home"
