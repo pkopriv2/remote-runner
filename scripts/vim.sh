@@ -3,16 +3,6 @@
 package "vim"
 package "ctags" 
 
-file "$HOME/test" <<FILE
-	permissions "644"
-	contents<<CONTENTS
-test file
-	test file
-		test file
-			test file
-CONTENTS
-FILE
-
 #users=( $(find /home -type d -maxdepth 1 -mindepth 1 | sed 's|^.*\/\([^\/]\+\)$|\1|') )
 #for user in "${users[@]}"
 #do

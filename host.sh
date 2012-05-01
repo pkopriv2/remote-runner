@@ -60,31 +60,23 @@ _ssh_bootstrap() {
 		exit 1
 	fi
 
-	ssh $1 "bash -s" <<EOH
+	ssh $1 "bash -s" 2>&1 > /dev/null <<EOH
 		user_home=\$(eval "echo ~$user")
 		if [[ ! -d \$user_home/.ssh ]]
 		then
 			mkdir \$user_home/.ssh
-		else
-			echo "\$user_home/.ssh exists"
 		fi
 
 		if [[ ! -f \$user_home/.ssh/authorized_keys ]]
 		then
-			touch $\user_home/.ssh/authorized_keys
+			touch \$user_home/.ssh/authorized_keys
 		fi
 
 		IFS=$'\n'
 		if ! grep "$pub_key" \$user_home/.ssh/authorized_keys
 		then
 			echo $pub_key >> \$user_home/.ssh/authorized_keys
-		else
-			echo "$pub_key is alread added to \$user_home/.ssh/authorized_keys"
 		fi 
-
-		if [[ -f \$user_home/.ssh/authorized_keys ]]
-		then 
-		fi
 EOH
 }
 

@@ -13,8 +13,7 @@ require "lib/log.sh"
 require "host.sh"
 require "key.sh"
 
-#IFS=$'\n'
-
+IFS=$'\n'
 execute() {
 	_ssh_lib() {
 		for script in $rr_home/lib/*.sh
@@ -65,9 +64,15 @@ execute() {
 		local script=$2
 	fi 
 
+	if [[ -z $script ]]
+	then
+		log_error "Must provide a script."
+		exit 1
+	fi
+
 	if [[ ! -f $script ]] 
 	then
-		log_error "Unable to locate file [$script]"
+		log_error "Unable to locate script [$script]"
 		exit 1
 	fi
 	

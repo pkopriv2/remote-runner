@@ -16,10 +16,6 @@ require() {
 	then
 		return
 	fi
-
-	# source the script
-	. $script 
-
-	# store a record of the fact
-	requires["$script"]="1"
+	
+	. $script  && requires["$script"]="1"
 }
