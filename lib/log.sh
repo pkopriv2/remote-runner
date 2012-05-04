@@ -4,7 +4,7 @@
 # a tty has been allocated.
 #
 log_info() {
-	if ! tput &> /dev/null
+	if ! tput setaf &> /dev/null
 	then
 		echo $1
 	else
@@ -17,7 +17,7 @@ log_info() {
 # has gone wrong.
 #
 log_error() {
-	if ! tput &> /dev/null
+	if ! tput setaf &> /dev/null
 	then
 		echo $1 >&2
 	else

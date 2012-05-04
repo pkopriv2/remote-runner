@@ -1,0 +1,10 @@
+#! /bin/bash
+read file
+
+if [[ ! -f $file ]]
+then
+	echo "File [$file] does not exist." >&2
+	exit 1
+fi
+
+cat $file

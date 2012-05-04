@@ -48,13 +48,15 @@ EOH
 _ssh_bootstrap() {
 	log_info "Copying key [$2] to host [$1]"
 
-	if ! local user=$(login_get_user "$1" &2> /dev/null)
+	local user=$(login_get_user "$1" 2> /dev/null)
+	if [[ -z $user ]]
 	then
 		log_error "Unable to determine user from login [$1]"
 		exit 1
 	fi
 
-	if ! local pub_key=$(key_get "$2" &2> /dev/null)
+	local pub_key=$(key_get "$2" 2> /dev/null)
+	if [[ -z $pub_key ]]
 	then 
 		log_error "Unable to determine value of public key [$2]"
 		exit 1
@@ -82,8 +84,8 @@ EOH
 
 # Copies a public key to the specified host.
 #
-# @param host The hostname/ip of the host to bootstrap
-# @param key_file The public key to send to the host. [default="default"]
+# @param $1 The hostname/ip of the host to bootstrap
+# @param $2 The public key to send to the host. [default="default"]
 host_bootstrap() {
 	if [[ $# -lt 1 ]]
 	then

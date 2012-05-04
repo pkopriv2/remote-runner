@@ -21,7 +21,11 @@ key_create() {
 
 	log_info "Creating public/private key pair [$key_name]"
 
-	local err=$(ssh-keygen -t rsa -f $key_file -N "" 2>&1 >/dev/null)
+	printf "%s" "Enter a passphrase:"
+	read -s passphrase
+	echo
+
+	local err=$(ssh-keygen -t rsa -f $key_file -N "$passphrase" 2>&1 >/dev/null)
 	if [[ $err  ]]
 	then
 		log_error "Error creating keys [$key_name]: $err"

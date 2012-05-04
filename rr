@@ -12,6 +12,7 @@ require "lib/login.sh"
 require "lib/log.sh"
 require "host.sh"
 require "key.sh"
+require "role.sh"
 
 IFS=$'\n'
 execute() {
@@ -37,16 +38,15 @@ execute() {
 	}
 
 	_ssh_sudo() {
-		log_error "Undefined"
-		#printf "%s" "[sudo] password for $USER:"
-		#read -s password
+		printf "%s" "[sudo] password for $USER:"
+		read -s password
 
-		#echo "$password"
-		#{ 
-			#echo "$password"
-			#echo "$(_ssh_lib)"
-			#cat $3
-		#} | ssh -t -i $2 $1 "sudo -S bash -s"
+		echo "$password"
+		{ 
+			echo "$password"
+			echo "$(_ssh_lib)"
+			cat $3
+		} | ssh -t -i $2 $1 "sudo -S bash -s"
 	}
 
 	if [[ $# < 1 ]]
@@ -108,7 +108,7 @@ action="${args[0]}"
 shift
 
 case "$action" in
-	key|host)
+	key|host|role)
 		"$action"_action "$@"
 		;;
 	help)
