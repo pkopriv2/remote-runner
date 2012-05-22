@@ -1,10 +1,20 @@
-#! /bin/bash
-read file
+#! /usr/bin/env ruby 
 
-if [[ ! -f $file ]]
-then
-	echo "File [$file] does not exist." >&2
-	exit 1
-fi
+require 'optparse'
+require 'socket'                # Get sockets from stdlib
 
-cat $file
+
+server = TCPServer.open(1234)   # Socket to listen on port 2000
+while true 
+	Thread.start(server.accept) do |client|
+		file = client.readline.chop
+
+	 	unless File.exists?(file)
+			puts "No such file exists: #{file}"
+			client.close()
+		end
+
+		client.puts IO.read(file)
+		client.close
+	end
+end	

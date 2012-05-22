@@ -10,9 +10,11 @@ source $rr_home/require.sh
 
 require "lib/login.sh"
 require "lib/log.sh"
+require "lib/inet.sh"
 require "host.sh"
 require "key.sh"
 require "role.sh"
+require "archive.sh"
 
 IFS=$'\n'
 execute() {
@@ -30,9 +32,22 @@ execute() {
 		cat "$rr_host_home/$login.sh"
 	}
 
+
+	_fileserver_start() {
+		$rr_home/fileserver > /dev/null &
+	}
+
+	_fileserver_stop() {
+		for job in $(jobs -p)
+		do
+			kill -9 $job &> /dev/null
+		done
+	}
+
 	_ssh() {
 		{ 
-			echo "$(_ssh_lib)"
+			echo "server_ip=$(inet_src_ip "$(login_get_host $1)")"
+			#echo $(_ssh_lib)
 			cat $3
 		} | ssh -t -i $2 $1 "bash -s"
 	}
@@ -90,12 +105,19 @@ execute() {
 		exit 1
 	fi
 
+	_fileserver_start
+
 	if [[ "$1" == "sudo" ]]
 	then
 		_ssh_sudo "$login" "$key_file" "$script"
 	else
 		_ssh "$login" "$key_file" "$script"
 	fi
+
+	for job in $(jobs -p)
+	do
+		kill -9 $job &> /dev/null
+	done
 }
 
 help() {

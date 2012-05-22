@@ -2,7 +2,6 @@
 
 # Provides a useful dsh method that will easily create
 #
-
 file() {
 	log_info "Creating file [$1]"
 
