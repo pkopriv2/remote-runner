@@ -6,6 +6,8 @@ require "lib/dir.sh"
 rr_archive_home=${rr_archive_home:-$rr_home/archives}
 dir_create_if_missing "$rr_archive_home"
 
+
+
 # Generate a archive.  An archive
 # 
 # @param name The name of the archive to create [default="default"]
@@ -72,11 +74,20 @@ archive_delete() {
 archive_list() {
 	log_info "Archives:"
 
-	local list=($(builtin cd "$rr_archive_home" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
+	local list=( $(builtin cd "$rr_archive_home" ; find . -maxdepth 1 -mindepth 1 -type d | sed 's|^\.\/||') )
 
 	for file in "${list[@]}"
 	do
 		echo "   - $file"
+	done
+}
+
+_archive_list() {
+	local list=( $(builtin cd "$rr_archive_home" ; find . -maxdepth 1 -mindepth 1 -type d | sed 's|^\.\/||') )
+
+	for file in "${list[@]}"
+	do
+		echo $file
 	done
 }
 

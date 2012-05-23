@@ -15,6 +15,7 @@ require "host.sh"
 require "key.sh"
 require "role.sh"
 require "archive.sh"
+require "fileserver.sh"
 
 IFS=$'\n'
 execute() {
@@ -28,27 +29,20 @@ execute() {
 		do
 			cat $script
 		done
+
+		for script in $rr_archive_home/$1/scripts/*.sh
+		do
+			cat $script
+		done
 		
 		cat "$rr_host_home/$login.sh"
-	}
-
-
-	_fileserver_start() {
-		$rr_home/fileserver > /dev/null &
-	}
-
-	_fileserver_stop() {
-		for job in $(jobs -p)
-		do
-			kill -9 $job &> /dev/null
-		done
 	}
 
 	_ssh() {
 		{ 
 			echo "server_ip=$(inet_src_ip "$(login_get_host $1)")"
-			#echo $(_ssh_lib)
-			cat $3
+			echo "fileserver_port=$fileserver_port"
+			_ssh_lib $3
 		} | ssh -t -i $2 $1 "bash -s"
 	}
 
@@ -73,24 +67,12 @@ execute() {
 	if [[ "$1" == "sudo" ]]
 	then
 		local login=$2
-		local script=$3
+		local archive_regexp=$3
 	else
 		local login=$1
-		local script=$2
+		local archive_regexp=$2
 	fi 
 
-	if [[ -z $script ]]
-	then
-		log_error "Must provide a script."
-		exit 1
-	fi
-
-	if [[ ! -f $script ]] 
-	then
-		log_error "Unable to locate script [$script]"
-		exit 1
-	fi
-	
 	local login=$(login "$login")
 	if ! source $rr_host_home/$login.sh
 	then
@@ -105,18 +87,24 @@ execute() {
 		exit 1
 	fi
 
-	_fileserver_start
-
-	if [[ "$1" == "sudo" ]]
-	then
-		_ssh_sudo "$login" "$key_file" "$script"
-	else
-		_ssh "$login" "$key_file" "$script"
-	fi
-
-	for job in $(jobs -p)
+	archives_list=$(_archive_list) 
+	for archive in "${archives_list[@]}" 
 	do
-		kill -9 $job &> /dev/null
+		if expr "$archive" : "$archive_regexp" > /dev/null
+		then
+			log_info "Running archive [$archive]."
+
+			fileserver_start $rr_archive_home/$archive/files 
+
+			if [[ "$1" == "sudo" ]]
+			then
+				_ssh_sudo "$login" "$key_file" "$archive"
+			else
+				_ssh "$login" "$key_file" "$archive"
+			fi
+
+			fileserver_stop > /dev/null
+		fi
 	done
 }
 
@@ -130,7 +118,7 @@ action="${args[0]}"
 shift
 
 case "$action" in
-	key|host|role)
+	key|host|role|archive)
 		"$action"_action "$@"
 		;;
 	help)
