@@ -14,11 +14,42 @@ dir_create_if_missing "$rr_host_home"
 host_list() {
 	log_info "Boostrapped hosts:"
 
-	local list=($(builtin cd "$rr_host_home" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
+	local list=($(_host_list))
 
 	for file in "${list[@]}"
 	do
 		echo "   - $file"
+	done
+}
+
+_host_list() {
+	local list=($(builtin cd "$rr_host_home" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
+
+	for file in "${list[@]}"
+	do
+		echo "$file"
+	done
+}
+
+# Given a regexp string, return all the hosts
+# that match.
+#
+#
+_host_match() {
+	if [[ -z $1 ]]
+	then
+		log_error "Must supply a non-empty regexp"
+		exit 1
+	fi 
+
+	local list=($(_host_list))
+
+	for host in "${list[@]}"
+	do
+		if expr "$host" : ".*$1" &> /dev/null
+		then
+			echo $host	
+		fi
 	done
 }
 
@@ -132,6 +163,24 @@ host_show() {
 	cat $rr_host_home/$login.sh | grep '^[^#]' | sed 's|^\(.\)|   \1|'
 }
 
+host_edit() {
+	if [[ $# != 1 ]]
+	then
+		log_error "Must provide a login"
+		exit 1
+	fi
+
+	local login=$(login "$1")
+	if [[ ! -f $rr_host_home/$login.sh ]] 
+	then
+		log_error "That host [$login] has not been bootstrapped"
+		exit 1
+	fi
+
+	local host=$(login_get_host "$login")
+	${EDITOR:-vim} $rr_host_home/$login.sh
+}
+
 host_help() {
 	log_error "Undefined"
 }
@@ -143,7 +192,7 @@ host_action() {
 	unset args[0]
 
 	case "$action" in
-		list|bootstrap|execute|show)
+		list|bootstrap|execute|show|edit)
 			host_$action "${args[@]}"
 			;;
 		*)

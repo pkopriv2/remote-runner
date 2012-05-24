@@ -16,8 +16,8 @@ file() {
 	}
 
 	local group="$USER"
-	owner() {
-		owner=$1
+	group() {
+		group=$1
 	}
 
 	local permissions="644"

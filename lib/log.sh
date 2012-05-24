@@ -1,5 +1,10 @@
 #! /bin/bash
 
+
+log_debug() {
+	echo $1
+}
+
 # Logs a message out in a friendly green color if 
 # a tty has been allocated.
 #

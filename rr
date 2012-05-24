@@ -16,96 +16,54 @@ require "key.sh"
 require "role.sh"
 require "archive.sh"
 require "fileserver.sh"
+require "runlist.sh"
+
 
 IFS=$'\n'
 execute() {
-	_ssh_lib() {
-		for script in $rr_home/lib/*.sh
-		do
-			cat $script
-		done
-
-		for script in $rr_home/dsl/*.sh
-		do
-			cat $script
-		done
-
-		for script in $rr_archive_home/$1/scripts/*.sh
-		do
-			cat $script
-		done
-		
-		cat "$rr_host_home/$login.sh"
-	}
-
-	_ssh() {
-		{ 
-			echo "server_ip=$(inet_src_ip "$(login_get_host $1)")"
-			echo "fileserver_port=$fileserver_port"
-			_ssh_lib $3
-		} | ssh -t -i $2 $1 "bash -s"
-	}
-
-	_ssh_sudo() {
-		printf "%s" "[sudo] password for $USER:"
-		read -s password
-
-		echo "$password"
-		{ 
-			echo "$password"
-			echo "$(_ssh_lib)"
-			cat $3
-		} | ssh -t -i $2 $1 "sudo -S bash -s"
-	}
-
 	if [[ $# < 1 ]]
 	then
-		log_error "Not enough arguments."
+		log_error "Must provide a host regexp."
 		exit 1
 	fi
 
-	if [[ "$1" == "sudo" ]]
-	then
-		local login=$2
-		local archive_regexp=$3
-	else
-		local login=$1
-		local archive_regexp=$2
-	fi 
+	local host_list=( $( _host_match $1) )
+	log_info "Hosts have expanded to: [ ${host_list[*]} ]"
 
-	local login=$(login "$login")
-	if ! source $rr_host_home/$login.sh
-	then
-		log_error "Error sourcing client file [$login]."
-		exit 1
-	fi
+	shift
 
-	local key_file=$rr_key_home/id_rsa.${key_name:-"default"}
-	if [[ ! -f $key_file ]] 
-	then 
-		log_error "That key file [$key_file] doesn't exist"
-		exit 1
-	fi
-
-	archives_list=$(_archive_list) 
-	for archive in "${archives_list[@]}" 
+	for host in "${host_list[@]}"
 	do
-		if expr "$archive" : "$archive_regexp" > /dev/null
-		then
-			log_info "Running archive [$archive]."
+		(
+			log_debug "Building host environment [$host]"
+			source_host $host
 
-			fileserver_start $rr_archive_home/$archive/files 
+			for archive in "${archives[@]}"
+			do
+				log_debug "Executing archive [$archive] on host [$host]"
 
-			if [[ "$1" == "sudo" ]]
-			then
-				_ssh_sudo "$login" "$key_file" "$archive"
-			else
-				_ssh "$login" "$key_file" "$archive"
-			fi
 
-			fileserver_stop > /dev/null
-		fi
+				#{ 
+				#echo "server_ip=$(inet_src_ip "$(login_get_host $1)")"
+				#echo "fileserver_port=$fileserver_port"
+				#_ssh_lib $3
+				#} | ssh -t -i $2 $1 "bash -s"
+			done
+		) || exit 1
+
+
+
+
+		##fileserver_start $rr_archive_home/$archive/files 
+
+		#log_info "Running archive [$archive]."
+		#_ssh "$login" "$key_file" "$archive"
+
+		#fileserver_stop &> /dev/null
 	done
+
+
+
 }
 
 help() {

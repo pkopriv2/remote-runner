@@ -1,0 +1,13 @@
+#! /bin/bash
+
+_ssh_sudo() {
+	printf "%s" "[sudo] password for $USER:"
+	read -s password
+
+	echo "$password"
+	{ 
+		echo "$password"
+		echo "$(_ssh_lib)"
+		cat $3
+	} | ssh -t -i $2 $1 "sudo -S bash -s"
+}

@@ -1,7 +1,7 @@
 #! /bin/bash
 
 archive_file() {
-	log_info "Creating file [$1]"
+	log_info "Processing archive_file file [$1]"
 
 	local src=""
 	src() {
@@ -26,12 +26,20 @@ archive_file() {
 	. /dev/stdin
 
 	# Download the file
-	echo $src | nc $server_ip $fileserver_port > $1
+	file=$(echo $src | nc $server_ip $fileserver_port)
 	if (( $? )) 
 	then
 		log_error "Error downloading file [$1] and creating file [$1]"
 		exit 1
 	fi
+
+	if [[ -z $file ]]
+	then
+		log_error "Error Downloading file: [$1]"
+		exit 1
+	fi 
+
+	echo -ne "$file" > $1
 
 	if ! chown $owner:$group $1 
 	then
