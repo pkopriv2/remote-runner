@@ -16,7 +16,6 @@ require "key.sh"
 require "role.sh"
 require "archive.sh"
 require "fileserver.sh"
-require "runlist.sh"
 
 declare -A globals
 declare -A attributes

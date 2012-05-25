@@ -68,7 +68,7 @@ EOF
 }
 
 fileserver_stop() {
-	kill -9 $fileserver_pid 2>/dev/null
+	kill $fileserver_pid 2>/dev/null
 	wait $fileserver_pid 2>/dev/null
 	unset -v fileserver_pid 
 	trap - INT TERM EXIT
