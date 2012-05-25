@@ -4,12 +4,10 @@ require "host.sh"
 require "role.sh"
 
 source_host() {
-	local key="default"
 	key() {
-		key=$1
+		key=${1:-"default"}
 	}
 
-	local roles=()
 	roles() {
 		roles=($*)
 	}
@@ -27,7 +25,6 @@ source_host() {
 		attributes[$1]=$2
 	}
 
-	archives=()
 	archives() {
 		archives=( ${archives[*]} $* )
 	}

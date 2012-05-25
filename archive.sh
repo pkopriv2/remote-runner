@@ -7,6 +7,23 @@ rr_archive_home=${rr_archive_home:-$rr_home/archives}
 dir_create_if_missing "$rr_archive_home"
 
 
+_archive_get_name() {
+	if echo $1 | grep '::' &> /dev/null
+	then
+		echo $1 | sed 's|::.*$||'			
+	else
+		echo $1
+	fi
+}
+
+_archive_get_script() {
+	if echo $1 | grep '::' &> /dev/null
+	then
+		echo $1 | sed 's|^.*::||'
+	else
+		echo "default"
+	fi
+}
 
 # Generate a archive.  An archive
 # 

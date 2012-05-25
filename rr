@@ -18,6 +18,88 @@ require "archive.sh"
 require "fileserver.sh"
 require "runlist.sh"
 
+declare -A globals
+declare -A attributes
+
+_runtime_env() {
+	key() {
+		key=${1:-"default"}
+	}
+
+	roles() {
+		roles=($*)
+	}
+
+	attr() {
+		attributes+=(["$1"]=$2)
+	}
+
+	archives() {
+		archives=( ${archives[*]} $* )
+	}
+
+	if ! source $rr_host_home/$1.sh
+	then
+		log_error "Error sourcing host file [$host]"
+		exit 1
+	fi
+
+	unset -f key
+	unset -f roles
+
+	for role in "${roles[@]}"
+	do
+		if [[ ! -f $rr_role_home/$role.sh ]] 
+		then
+			log_error "Unable to determine run list for host [$1].  Role [$role] does not exist."
+			exit 1
+		fi 
+
+		if ! source $rr_role_home/$role.sh
+		then 
+			log_error "Error sourcing role file [$role]: $err"
+			exit 1
+		fi
+	done
+
+	unset -f attr
+	unset -f archives
+}
+
+
+_runtime_lib() {
+	archive_name=$(_archive_get_name $2)			
+	archive_script=$(_archive_get_script $2)	
+
+	if [ ! -f $rr_archive_home/$archive_name/scripts/$archive_script.sh ]
+	then
+		echo $rr_archive_home/$archive_name/scripts/$archive_script.sh
+		log_error "Unable to locate archive [$2]"
+		exit 1
+	fi
+
+	cat - <<EOH
+server_ip=$(inet_src_ip "$(login_get_host $1)")
+fileserver_port=$fileserver_port
+archive_name=$archive_name
+archive_script=$archive_script
+roles=(${roles[*]})
+EOH
+
+	for script in $rr_home/lib/*.sh
+	do
+		cat $script
+	done
+
+	for script in $rr_home/dsl/*.sh
+	do
+		cat $script
+	done
+
+	cat $rr_archive_home/$archive_name/scripts/$archive_script.sh 
+}
+
+
 
 IFS=$'\n'
 execute() {
@@ -34,36 +116,39 @@ execute() {
 
 	for host in "${host_list[@]}"
 	do
+		log_debug "Sourcing host environment [$host]"
+
+		# Build the host environment.  Sandbox it into its
+		# own subshell.
 		(
-			log_debug "Building host environment [$host]"
-			source_host $host
+			# This function will source the host and all the
+			# role files that are needed
+			#
+			_runtime_env $host
+
+			local key_file=$rr_key_home/id_rsa.${key_name:-"default"}
+			if [[ ! -f $key_file ]] 
+			then 
+				log_error "That key file [$key_file] doesn't executeist"
+				exit 1
+			fi
 
 			for archive in "${archives[@]}"
 			do
-				log_debug "Executing archive [$archive] on host [$host]"
+				log_info "Executing archive [$archive] on host [$host]"
 
+				fileserver_start $rr_archive_home/$(_archive_get_name $archive)/files 
 
-				#{ 
-				#echo "server_ip=$(inet_src_ip "$(login_get_host $1)")"
-				#echo "fileserver_port=$fileserver_port"
-				#_ssh_lib $3
-				#} | ssh -t -i $2 $1 "bash -s"
+				{
+					_runtime_lib $host $archive
+				} | ssh -t -i $key_file $host "bash -s"
+
+				fileserver_stop
 			done
+
 		) || exit 1
 
-
-
-
-		##fileserver_start $rr_archive_home/$archive/files 
-
-		#log_info "Running archive [$archive]."
-		#_ssh "$login" "$key_file" "$archive"
-
-		#fileserver_stop &> /dev/null
 	done
-
-
-
 }
 
 help() {

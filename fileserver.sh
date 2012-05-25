@@ -44,7 +44,7 @@ while true
 		full_path="#{base_path}/#{file}"
 
 	 	unless File.exists?(full_path)
-			puts "No such file exists: #{full_path}"
+			#puts "No such file exists: #{full_path}"
 			client.close()
 		end
 
@@ -68,7 +68,8 @@ EOF
 }
 
 fileserver_stop() {
-	kill $fileserver_pid 2>/dev/null
+	kill -9 $fileserver_pid 2>/dev/null
 	wait $fileserver_pid 2>/dev/null
+	unset -v fileserver_pid 
 	trap - INT TERM EXIT
 }
