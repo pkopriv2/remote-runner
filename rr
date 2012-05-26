@@ -76,7 +76,7 @@ _runtime_lib() {
 		log_error "Unable to locate archive [$2]"
 		exit 1
 	fi
-
+	
 	cat - <<EOH
 server_ip=$(inet_src_ip "$(login_get_host $1)")
 fileserver_port=$fileserver_port
@@ -115,22 +115,21 @@ execute() {
 
 	for host in "${host_list[@]}"
 	do
-		log_debug "Sourcing host environment [$host]"
+		log_debug "Sourcing host environment: $host"
 
 		# Build the host environment.  Sandbox it into its
 		# own subshell.
 		(
-			# This function will source the host and all the
-			# role files that are needed
-			#
 			_runtime_env $host
 
-			local key_file=$rr_key_home/id_rsa.${key_name:-"default"}
+			local key_file=$rr_key_home/id_rsa.${key:-"default"}
 			if [[ ! -f $key_file ]] 
 			then 
 				log_error "That key file [$key_file] doesn't executeist"
 				exit 1
 			fi
+
+			log_info "Runlist has expanded to: [ ${archives[*]} ]"
 
 			for archive in "${archives[@]}"
 			do
@@ -142,7 +141,15 @@ execute() {
 					_runtime_lib $host $archive
 				} | ssh -t -i $key_file $host "bash -s"
 
-				fileserver_stop
+				ret=$?
+				sleep 45
+
+				#fileserver_stop
+
+				#if [ $ret -ne 0 ]
+				#then
+					#exit 1
+				#fi
 			done
 
 		) || exit 1

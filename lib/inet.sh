@@ -32,5 +32,5 @@ inet_src_ip() {
 		ip=$(host_get_ip "$1")
 	fi
 
-	ip route get $ip | head -n 1 | awk '{print $5;}'
+	ip route get $ip | head -n 1 | sed 's|.*src \([^ ]\+\)|\1|'
 }

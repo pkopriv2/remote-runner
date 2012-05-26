@@ -34,7 +34,7 @@ require 'socket'
 base_path="$1"
 base_path=base_path.gsub(/\/$/, '')
 
-server = TCPServer.open($fileserver_port)   # Socket to listen on port 2000
+server = TCPServer.open($fileserver_port)   
 while true 
 	Thread.start(server.accept) do |client|
 		file = client.readline.chop
@@ -44,7 +44,7 @@ while true
 		full_path="#{base_path}/#{file}"
 
 	 	unless File.exists?(full_path)
-			#puts "No such file exists: #{full_path}"
+			puts "No such file exists: #{full_path}"
 			client.close()
 		end
 
@@ -72,4 +72,5 @@ fileserver_stop() {
 	wait $fileserver_pid 2>/dev/null
 	unset -v fileserver_pid 
 	trap - INT TERM EXIT
+	rm -f /tmp/fileserver.rb
 }

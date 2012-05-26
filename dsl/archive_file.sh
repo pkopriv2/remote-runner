@@ -1,7 +1,20 @@
 #! /bin/bash
 
+nc_cmd=${nc_cmd:-nc}
+#if command -v nc.traditional
+#then
+	#nc_cmd=nc.traditional
+#fi
+
 archive_file() {
+	if [[ -z $1 ]]
+	then
+		log_error "Must supply a file name."
+		exit 1 
+	fi 
+
 	log_info "Processing archive_file file [$1]"
+
 
 	local src=""
 	src() {
@@ -25,29 +38,21 @@ archive_file() {
 
 	. /dev/stdin
 
-	# Download the file
-	file=$(echo $src | nc $server_ip $fileserver_port)
+	eval "path=$1"
+	echo $src | $nc_cmd $server_ip $fileserver_port > $path
 	if (( $? )) 
 	then
-		log_error "Error downloading file [$1] and creating file [$1]"
+		log_error "Error downloading file [$src] and creating file [$1]"
 		exit 1
 	fi
 
-	if [[ -z $file ]]
-	then
-		log_error "Error Downloading file: [$1]"
-		exit 1
-	fi 
-
-	echo -ne "$file" > $1
-
-	if ! chown $owner:$group $1 
+	if ! chown $owner:$group $path 
 	then
 		log_error "Error setting ownership of file [$1]" 
 		exit 1
 	fi
 
-	if ! chmod $permissions $1
+	if ! chmod $permissions $path
 	then
 		log_error "Error setting permissions of file [$1]"
 		exit 1
