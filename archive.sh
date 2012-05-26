@@ -1,6 +1,6 @@
 #! /bin/bash
 
-require "lib/log.sh"
+require "local/log.sh"
 require "lib/dir.sh"
 
 rr_archive_home=${rr_archive_home:-$rr_home/archives}

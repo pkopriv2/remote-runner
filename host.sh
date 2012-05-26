@@ -3,7 +3,7 @@
 require "lib/login.sh"
 require "lib/user.sh"
 require "lib/host.sh"
-require "lib/log.sh"
+require "local/log.sh"
 require "key.sh"
 
 rr_host_home=${rr_host_home:-$rr_home/hosts}

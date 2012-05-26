@@ -6,11 +6,11 @@ export rr_host_home
 rr_home=${rr_home:-$HOME/.rr}
 rr_host_home=${rr_host_home:-$rr_home/hosts}
 
-source $rr_home/require.sh
+source $rr_home/local/require.sh
 
 require "lib/login.sh"
-require "lib/log.sh"
 require "lib/inet.sh"
+require "local/log.sh"
 require "host.sh"
 require "key.sh"
 require "role.sh"
@@ -85,6 +85,11 @@ archive_script=$archive_script
 roles=(${roles[*]})
 EOH
 
+	for script in $rr_home/remote/*.sh
+	do
+		cat $script
+	done
+
 	for script in $rr_home/lib/*.sh
 	do
 		cat $script
@@ -142,14 +147,13 @@ execute() {
 				} | ssh -t -i $key_file $host "bash -s"
 
 				ret=$?
-				sleep 45
 
-				#fileserver_stop
+				fileserver_stop
 
-				#if [ $ret -ne 0 ]
-				#then
-					#exit 1
-				#fi
+				if [ $ret -ne 0 ]
+				then
+					exit 1
+				fi
 			done
 
 		) || exit 1

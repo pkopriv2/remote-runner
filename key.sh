@@ -1,6 +1,6 @@
 #! /bin/bash
 
-require "lib/log.sh"
+require "local/log.sh"
 require "lib/dir.sh"
 
 rr_key_home=${rr_key_home:-$rr_home/keys}

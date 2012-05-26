@@ -1,10 +1,10 @@
 #! /bin/bash
 
 nc_cmd=${nc_cmd:-nc}
-#if command -v nc.traditional
-#then
-	#nc_cmd=nc.traditional
-#fi
+if command -v nc.traditional $> /dev/null
+then
+	nc_cmd=nc.traditional
+fi
 
 archive_file() {
 	if [[ -z $1 ]]

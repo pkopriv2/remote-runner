@@ -44,7 +44,6 @@ while true
 		full_path="#{base_path}/#{file}"
 
 	 	unless File.exists?(full_path)
-			puts "No such file exists: #{full_path}"
 			client.close()
 		end
 
