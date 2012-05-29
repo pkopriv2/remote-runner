@@ -102,8 +102,7 @@ archive_delete() {
 archive_list() {
 	info "Archives:"
 
-	local list=$(_archive_list)
-	echo "${#list[@]}"
+	local list=( $(_archive_list) )
 
 	for file in "${list[@]}"
 	do
@@ -116,10 +115,10 @@ _archive_list() {
 
 	for e in "${list[@]}"
 	do
+		if [[ -d $rr_archive_home/$e ]] || [[ -h $rr_archive_home/$e ]]
+		then
 			echo "$e"
-		#if [[ -d $rr_archive_home/$e ]] || [[ -h $rr_archive_home/$e ]]
-		#then
-		#fi
+		fi
 	done
 }
 
