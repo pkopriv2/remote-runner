@@ -6,19 +6,22 @@ export rr_host_home
 rr_home=${rr_home:-$HOME/.rr}
 rr_host_home=${rr_host_home:-$rr_home/hosts}
 
+IFS=$'\n'
+
 source $rr_home/local/require.sh
+
+declare -A globals
+declare -A attributes
 
 require "lib/login.sh"
 require "lib/inet.sh"
+require "lib/array.sh"
 require "local/log.sh"
 require "host.sh"
 require "key.sh"
 require "role.sh"
 require "archive.sh"
 require "fileserver.sh"
-
-declare -A globals
-declare -A attributes
 
 _runtime_env() {
 	key() {
@@ -39,8 +42,7 @@ _runtime_env() {
 
 	if ! source $rr_host_home/$1.sh
 	then
-		log_error "Error sourcing host file [$host]"
-		exit 1
+		fail "Error sourcing host file [$host]"
 	fi
 
 	unset -f key
@@ -50,14 +52,12 @@ _runtime_env() {
 	do
 		if [[ ! -f $rr_role_home/$role.sh ]] 
 		then
-			log_error "Unable to determine run list for host [$1].  Role [$role] does not exist."
-			exit 1
+			fail "Unable to determine run list for host [$1].  Role [$role] does not exist."
 		fi 
 
 		if ! source $rr_role_home/$role.sh
 		then 
-			log_error "Error sourcing role file [$role]: $err"
-			exit 1
+			fail "Error sourcing role file [$role]: $err"
 		fi
 	done
 
@@ -67,23 +67,19 @@ _runtime_env() {
 
 
 _runtime_lib() {
-	archive_name=$(_archive_get_name $2)			
-	archive_script=$(_archive_get_script $2)	
+	cat - <<-EOH
+		server_ip=$(inet_src_ip "$(login_get_host $1)")
+	EOH
 
-	if [ ! -f $rr_archive_home/$archive_name/scripts/$archive_script.sh ]
-	then
-		echo $rr_archive_home/$archive_name/scripts/$archive_script.sh
-		log_error "Unable to locate archive [$2]"
-		exit 1
-	fi
-	
-	cat - <<EOH
-server_ip=$(inet_src_ip "$(login_get_host $1)")
-fileserver_port=$fileserver_port
-archive_name=$archive_name
-archive_script=$archive_script
-roles=(${roles[*]})
-EOH
+	for key in "${!attributes[@]}"
+	do
+		echo "$key=${attributes[$key]}"
+	done
+
+	for key in "${!globals[@]}"
+	do
+		echo "$key=${globals[$key]}"
+	done
 
 	for script in $rr_home/remote/*.sh
 	do
@@ -99,13 +95,8 @@ EOH
 	do
 		cat $script
 	done
-
-	cat $rr_archive_home/$archive_name/scripts/$archive_script.sh 
 }
 
-
-
-IFS=$'\n'
 execute() {
 	if [[ $# < 1 ]]
 	then
@@ -114,37 +105,58 @@ execute() {
 	fi
 
 	local host_list=( $( _host_match $1) )
-	log_info "Hosts have expanded to: [ ${host_list[*]} ]"
-
-	shift
+	log_info "Hosts have expanded to: $(array_print "${host_list[@]}") "
 
 	for host in "${host_list[@]}"
 	do
 		log_debug "Sourcing host environment: $host"
 
-		# Build the host environment.  Sandbox it into its
-		# own subshell.
 		(
 			_runtime_env $host
 
 			local key_file=$rr_key_home/id_rsa.${key:-"default"}
 			if [[ ! -f $key_file ]] 
 			then 
-				log_error "That key file [$key_file] doesn't executeist"
+				log_error "That key file [$key_file] doesn't exist!"
 				exit 1
 			fi
 
-			log_info "Runlist has expanded to: [ ${archives[*]} ]"
+			log_info "Runlist has expanded to: $(array_print ${archives[@]}) "
 
 			for archive in "${archives[@]}"
 			do
 				log_info "Executing archive [$archive] on host [$host]"
 
-				fileserver_start $rr_archive_home/$(_archive_get_name $archive)/files 
+				archive_name=$(_archive_get_name $archive)
+				archive_script=$(_archive_get_script $archive)
+				script=$rr_archive_home/$archive_name/scripts/$archive_script.sh
+
+				if [ ! -f $script ]
+				then
+					log_error "Unable to locate archive [$archive]"
+					exit 1
+				fi
+
+				fileserver_start $rr_archive_home/$archive_name/files 
 
 				{
 					_runtime_lib $host $archive
-				} | ssh -t -i $key_file $host "bash -s"
+
+					cat -<<-EOH
+						archive_name=$archive_name
+						archive_script=$archive_script
+						roles=(${roles[*]})
+					EOH
+				} | ssh -t -i $key_file $host "cat - > /tmp/rr.sh"
+
+				{
+					echo -ne ". /tmp/rr.sh; $archive_name::$archive_script() { echo &> /dev/null;"
+
+					cat $script
+
+					echo "}; $archive_name::$archive_script;"
+				} | ssh -t -i $key_file $host "bash /dev/stdin; rm /tmp/rr.sh"
+
 
 				ret=$?
 
@@ -155,9 +167,7 @@ execute() {
 					exit 1
 				fi
 			done
-
 		) || exit 1
-
 	done
 }
 

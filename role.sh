@@ -16,13 +16,13 @@ role_create() {
 
 	if [[ -f $role_file ]]
 	then
-		log_error "Role [$role_name] already exists"
+		error "Role [$role_name] already exists"
 		exit 1
 	fi
 
-	log_info "Creating role [$role_name]"
+	info "Creating role [$role_name]"
 	touch $role_file 
-	log_info "Successfully created role [$role_name]"
+	info "Successfully created role [$role_name]"
 }
 
 # Edit a role file with the environment $EDITOR program
@@ -35,7 +35,7 @@ role_edit() {
 
 	if [[ ! -f $role_file ]]
 	then
-		log_error "Role [$role_name] does not exist"
+		error "Role [$role_name] does not exist"
 		exit 1
 	fi
 
@@ -51,7 +51,7 @@ role_show() {
 
 	if [[ ! -f $role_file ]]
 	then
-		log_error "Role [$role_name] does not exist"
+		error "Role [$role_name] does not exist"
 		exit 1
 	fi
 
@@ -64,7 +64,7 @@ role_show() {
 role_delete() {
 	local role_name=${1:-"default"}
 
-	log_info "Deleting role [$role_name]"
+	info "Deleting role [$role_name]"
 	printf "%s" "Are you sure (y|n):"
 	read answer
 
@@ -77,7 +77,7 @@ role_delete() {
 	local role_file=$rr_role_home/$role_name.sh
 	if [[ ! -f $role_file ]]
 	then
-		log_error "Role [$role_name] does not exist"
+		error "Role [$role_name] does not exist"
 		exit 1
 	fi
 
@@ -88,7 +88,7 @@ role_delete() {
 # 
 # @param name The name of the role [default="default"]
 role_list() {
-	log_info "Roles:"
+	info "Roles:"
 
 	local list=($(builtin cd "$rr_role_home" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
 
@@ -100,7 +100,7 @@ role_list() {
 
 
 role_help() {
-	log_error "Undefined"
+	error "Undefined"
 }
 
 # Actually perform an action on the roles.

@@ -25,47 +25,65 @@ _archive_get_script() {
 	fi
 }
 
-# Generate a archive.  An archive
-# 
-# @param name The name of the archive to create [default="default"]
-archive_create() {
-	local archive_name=${1:-"default"}
-	local archive_file=$rr_archive_home/$archive_name.sh
-
-	if [[ -f $archive_file ]]
+#
+#
+#
+archive_install() {
+	if [[ ! -d $1 ]]
 	then
-		log_error "archive [$archive_name] already exists"
+		error "Archive [$1] doesn't exist."
 		exit 1
-	fi
+	fi 
 
-	log_info "Creating archive [$archive_name]"
-	touch $archive_file 
-	log_info "Successfully created archive [$archive_name]"
+	path=$(builtin cd $1; pwd)
+	info "Installing archive [$path]."
+
+	#if ! ln -s $path $rr_archive_home
+	#then
+		#error "Error installing archive [$1]."
+		#exit 1
+	#fi 
+	
+	#info "Successfully installed archive [$!]"
 }
 
-# Get the value of a public archive
-#
-# @param name The name of the archive [default="default"]
-archive_show() {
-	local archive_name=${1:-"default"}
-	local archive_file=$rr_archive_home/$archive_name.sh
-
-	if [[ ! -f $archive_file ]]
+# Generate a archive in the current working directory.
+# The following structure will be made:
+# 
+# @param name The name of the archive to create
+archive_create() {
+	if [[ -z $1 ]]
 	then
-		log_error "archive [$archive_name] does not exist"
+		error "Must supply an archive name."
 		exit 1
 	fi
 
-	cat $archive_file
+	info "Creating archive [$1]"
+	mkdir $1
+	mkdir $1/files
+	mkdir $1/scripts
+	touch $1/scripts/default.sh
+	info "Successfully created archive [$1]"
 }
 
 # Get the value of a public archive
 #
 # @param name The name of the archive [default="default"]
 archive_delete() {
-	local archive_name=${1:-"default"}
+	if [[ -z $1 ]]
+	then
+		error "Must supply an archive name."
+		exit 1
+	fi
 
-	log_info "Deleting archive [$archive_name]"
+	archive=$rr_archive_home/$1
+	if [[ ! -d $archive ]]
+	then
+		error "Archive [$archive] doesn't exist."
+		exit 1
+	fi
+
+	info "Deleting archive [$archive]"
 	printf "%s" "Are you sure (y|n):"
 	read answer
 
@@ -75,23 +93,17 @@ archive_delete() {
 		exit 0
 	fi
 
-	local archive_file=$rr_archive_home/$archive_name.sh
-	if [[ ! -f $archive_file ]]
-	then
-		log_error "archive [$archive_name] does not exist"
-		exit 1
-	fi
-
-	rm -f $archive_file
+	rm -fr $archive
 }
 
-# Get a list of all the available archives
+# Get a list of all the installed archives
 # 
 # @param name The name of the archive [default="default"]
 archive_list() {
-	log_info "Archives:"
+	info "Archives:"
 
-	local list=( $(builtin cd "$rr_archive_home" ; find . -maxdepth 1 -mindepth 1 -type d | sed 's|^\.\/||') )
+	local list=$(_archive_list)
+	echo "${#list[@]}"
 
 	for file in "${list[@]}"
 	do
@@ -100,17 +112,20 @@ archive_list() {
 }
 
 _archive_list() {
-	local list=( $(builtin cd "$rr_archive_home" ; find . -maxdepth 1 -mindepth 1 -type d | sed 's|^\.\/||') )
+	local list=( $(builtin cd "$rr_archive_home" ; find . -maxdepth 1 -mindepth 1 | sed 's|^\.\/||' | sort ) )
 
-	for file in "${list[@]}"
+	for e in "${list[@]}"
 	do
-		echo $file
+			echo "$e"
+		#if [[ -d $rr_archive_home/$e ]] || [[ -h $rr_archive_home/$e ]]
+		#then
+		#fi
 	done
 }
 
 
 archive_help() {
-	log_error "Undefined"
+	error "Undefined"
 }
 
 # Actually perform an action on the archives.
@@ -122,7 +137,7 @@ archive_action() {
 	unset args[0]
 
 	case "$action" in
-		list|show|create|delete|edit)
+		list|show|create|delete|edit|install)
 			archive_$action "${args[@]}"
 			;;
 		*)

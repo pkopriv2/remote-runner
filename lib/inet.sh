@@ -1,5 +1,6 @@
 #! /bin/bash
 
+
 # Given an interface, get the inet address associated 
 # with it.
 #
@@ -15,7 +16,7 @@ inet_get_addr() {
 inet_get_iface() {
 	if [[ $(expr "$1" : "^[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\$") == 0 ]]
 	then 
-		ip=$(host_get_ip "$1")
+		ip=$(inet_host_ip "$1")
 	fi
 
 	ip route get $ip | head -n 1 | awk '{print $3;}'
@@ -29,8 +30,17 @@ inet_get_iface() {
 inet_src_ip() {
 	if [[ $(expr "$1" : "^[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\$") == 0 ]]
 	then 
-		ip=$(host_get_ip "$1")
+		ip=$(inet_host_ip "$1")
 	fi
 
 	ip route get $ip | head -n 1 | sed 's|.*src \([^ ]\+\)|\1|'
+}
+
+
+# Gets the ip of the host.  Expecting the output of
+# the host command to be:
+#  	pkopriv2-fileserver has address 192.168.100.3
+# 
+inet_host_ip() {
+	expr "$(host $1)" : "^$1 has address \(.*\)$"
 }

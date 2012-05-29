@@ -12,7 +12,7 @@ dir_create_if_missing "$rr_host_home"
 # Lists all the hosts that have been bootstrapped.
 #
 host_list() {
-	log_info "Boostrapped hosts:"
+	info "Boostrapped hosts:"
 
 	local list=($(_host_list))
 
@@ -59,12 +59,11 @@ _host_match() {
 # @param $2 The key file to use when logging into this machine.
 #
 _file_bootstrap() {
-	log_info "Creating host file [$1] using key [$2]"
+	info "Creating host file [$1] using key [$2]"
 
 	cat > $rr_host_home/$1.sh <<EOH
 #! /bin/bash
-
-key_name=$2 
+key "$2"
 EOH
 }
 
@@ -77,7 +76,7 @@ EOH
 #           normalized. (keys are assummed to be of the form: 
 #           id_rsa.<name>.pub).  
 _ssh_bootstrap() {
-	log_info "Copying key [$2] to host [$1]"
+	info "Copying key [$2] to host [$1]"
 
 	local user=$(login_get_user "$1" 2> /dev/null)
 	if [[ -z $user ]]
@@ -159,7 +158,7 @@ host_show() {
 	local host=$(login_get_host "$login")
 	local ip=$(host_get_ip "$host")
 
-	log_info "$login: $ip"
+	info "$login: $ip"
 	cat $rr_host_home/$login.sh | grep '^[^#]' | sed 's|^\(.\)|   \1|'
 }
 

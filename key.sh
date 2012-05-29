@@ -15,11 +15,11 @@ key_create() {
 	local key_file=$rr_key_home/id_rsa.$key_name
 	if [[ -f $key_file ]]
 	then
-		log_error "Key pair [$key_name] already exist"
+		error "Key pair [$key_name] already exist"
 		exit 1
 	fi
 
-	log_info "Creating public/private key pair [$key_name]"
+	info "Creating public/private key pair [$key_name]"
 
 	printf "%s" "Enter a passphrase:"
 	read -s passphrase
@@ -28,11 +28,11 @@ key_create() {
 	local err=$(ssh-keygen -t rsa -f $key_file -N "$passphrase" 2>&1 >/dev/null)
 	if [[ $err  ]]
 	then
-		log_error "Error creating keys [$key_name]: $err"
+		error "Error creating keys [$key_name]: $err"
 		exit 1
 	fi 
 
-	log_info "Successfully created key [$key_name]"
+	info "Successfully created key [$key_name]"
 }
 
 # Get the value of a public key
@@ -43,7 +43,7 @@ key_get() {
 	local key_file=$rr_key_home/id_rsa.$key_name.pub
 	if [[ ! -f $key_file ]]
 	then
-		log_error "Unable to locate public key [$key_file]"
+		error "Unable to locate public key [$key_file]"
 		exit 1
 	fi
 
@@ -56,7 +56,7 @@ key_get() {
 key_delete() {
 	local key_name=${1:-"default"}
 
-	log_info "Deleting key [$key_name]"
+	info "Deleting key [$key_name]"
 	printf "%s" "Are you sure (y|n):"
 	read answer
 
@@ -69,7 +69,7 @@ key_delete() {
 	local key_file=$rr_key_home/id_rsa.$key_name
 	if [[ ! -f $key_file ]]
 	then
-		log_error "Unable to locate public key [$key_file]"
+		error "Unable to locate public key [$key_file]"
 		exit 1
 	fi
 
@@ -80,7 +80,7 @@ key_delete() {
 # 
 #
 key_list() {
-	log_info "SSH Keys:"
+	info "SSH Keys:"
 
 	local list=($(builtin cd "$rr_key_home" ; find . -maxdepth 1 -mindepth 1 -name 'id_rsa.*.pub' -print | sed 's|\.\/id_rsa\.\([^\.]*\)\.pub|\1|' | sort ))
 	for file in "${list[@]}"
@@ -91,7 +91,7 @@ key_list() {
 
 
 key_help() {
-	log_error "Undefined"
+	error "Undefined"
 }
 
 # Actually perform an action on the keys.

@@ -5,6 +5,12 @@ export fileserver_pid
 
 fileserver_port=${fileserver_port:-5001}
 
+if [[ -z globals ]] 
+then
+	declare -A globals
+fi
+
+globals+=( ["fileserver_port"]="$fileserver_port" )
 
 # Start the fileserver.  This is expecting a variable number of
 # path elements.
@@ -39,7 +45,7 @@ while true
 	Thread.start(server.accept) do |client|
 		file = client.readline.chop
 
-		puts "Processing download: #{file}"
+		#puts "Processing download: #{file}"
 
 		full_path="#{base_path}/#{file}"
 
