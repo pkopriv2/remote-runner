@@ -1,10 +1,7 @@
 #! /bin/bash
 
-export rr_home
-export rr_host_home
-
-rr_home=${rr_home:-$HOME/.rr}
-rr_host_home=${rr_host_home:-$rr_home/hosts}
+export rr_home=${rr_home:-$HOME/.rr}
+export rr_host_home=${rr_host_home:-$rr_home/hosts}
 
 IFS=$'\n'
 
@@ -28,16 +25,19 @@ _runtime_env() {
 		key=${1:-"default"}
 	}
 
+	roles=()
 	roles() {
-		roles=($*)
+		roles+=( $* )
 	}
 
+	attributes=()
 	attr() {
 		attributes+=(["$1"]=$2)
 	}
 
+	archives=()
 	archives() {
-		archives=( ${archives[*]} $* )
+		archives+=( $* )
 	}
 
 	if ! source $rr_host_home/$1.sh
@@ -60,9 +60,10 @@ _runtime_env() {
 			fail "Error sourcing role file [$role]: $err"
 		fi
 	done
+	
 
-	unset -f attr
-	unset -f archives
+	archives=( $(echo "${archives[*]}" | uniq) )
+	roles=( $(echo "${roles[*]}" | uniq) )
 }
 
 
@@ -114,12 +115,14 @@ execute() {
 		(
 			_runtime_env $host
 
-			local key_file=$rr_key_home/id_rsa.${key:-"default"}
+			local key_file=$rr_key_home/id_rsa.$key
 			if [[ ! -f $key_file ]] 
 			then 
 				log_error "That key file [$key_file] doesn't exist!"
 				exit 1
 			fi
+
+			ssh-add $key_file 
 
 			log_info "Runlist has expanded to: $(array_print ${archives[@]}) "
 
@@ -127,9 +130,9 @@ execute() {
 			do
 				log_info "Executing archive [$archive] on host [$host]"
 
-				archive_name=$(_archive_get_name $archive)
-				archive_script=$(_archive_get_script $archive)
-				script=$rr_archive_home/$archive_name/scripts/$archive_script.sh
+				local archive_name=$(_archive_get_name $archive)
+				local archive_script=$(_archive_get_script $archive)
+				local script=$rr_archive_home/$archive_name/scripts/$archive_script.sh
 
 				if [ ! -f $script ]
 				then
@@ -151,12 +154,9 @@ execute() {
 
 				{
 					echo -ne ". /tmp/rr.sh; $archive_name::$archive_script() { echo &> /dev/null;"
-
 					cat $script
-
 					echo "}; $archive_name::$archive_script;"
 				} | ssh -t -i $key_file $host "bash /dev/stdin; rm /tmp/rr.sh"
-
 
 				ret=$?
 
@@ -167,7 +167,7 @@ execute() {
 					exit 1
 				fi
 			done
-		) || exit 1
+		) || fail "Error executing host [$1] runlist."
 	done
 }
 

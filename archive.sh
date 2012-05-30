@@ -1,11 +1,13 @@
 #! /bin/bash
 
+export rr_archive_home
+
 require "local/log.sh"
 require "lib/dir.sh"
+require "lib/fail.sh" 
 
 rr_archive_home=${rr_archive_home:-$rr_home/archives}
 dir_create_if_missing "$rr_archive_home"
-
 
 _archive_get_name() {
 	if echo $1 | grep '::' &> /dev/null
@@ -25,32 +27,32 @@ _archive_get_script() {
 	fi
 }
 
-#
-#
-#
 archive_install() {
+	if [[ -z $1 ]]
+	then
+		error "Must supply an archive name."
+		exit 1
+	fi
+
 	if [[ ! -d $1 ]]
 	then
-		error "Archive [$1] doesn't exist."
+		error "Directory [$1] doesn't exist."
 		exit 1
 	fi 
+	
+	info "Installing archive [$1]."
 
 	path=$(builtin cd $1; pwd)
-	info "Installing archive [$path]."
 
-	#if ! ln -s $path $rr_archive_home
-	#then
-		#error "Error installing archive [$1]."
-		#exit 1
-	#fi 
+	if ! ln -s $path $rr_archive_home
+	then
+		error "Error installing archive [$1]."
+		exit 1
+	fi 
 	
-	#info "Successfully installed archive [$!]"
+	info "Successfully installed archive [$1]"
 }
 
-# Generate a archive in the current working directory.
-# The following structure will be made:
-# 
-# @param name The name of the archive to create
 archive_create() {
 	if [[ -z $1 ]]
 	then
@@ -58,17 +60,26 @@ archive_create() {
 		exit 1
 	fi
 
+	if [[ -d $1 ]] || [[ -e $rr_archive_home/$1 ]]
+	then
+		error "That archive [$1] already exists."
+		exit 1
+	fi
+
 	info "Creating archive [$1]"
-	mkdir $1
-	mkdir $1/files
-	mkdir $1/scripts
-	touch $1/scripts/default.sh
+
+	if ! mkdir $1 &> /dev/null \
+	|| ! mkdir $1/files &> /dev/null \
+	|| ! mkdir $1/scripts &> /dev/null \
+	|| ! touch $1/scripts/default.sh &> /dev/null
+	then 
+		error "Error creating archive [$1]."
+		exit 1
+	fi
+
 	info "Successfully created archive [$1]"
 }
 
-# Get the value of a public archive
-#
-# @param name The name of the archive [default="default"]
 archive_delete() {
 	if [[ -z $1 ]]
 	then
@@ -93,20 +104,38 @@ archive_delete() {
 		exit 0
 	fi
 
-	rm -fr $archive
+	if [[ -h $archive ]]
+	then
+		rm -fr $(readlink $archive)
+	else 
+		rm -fr $archive/
+	fi
 }
 
-# Get a list of all the installed archives
-# 
-# @param name The name of the archive [default="default"]
 archive_list() {
+	info "Archives:"
+
+		local list=( $(_archive_list) )
+
+		for file in "${list[@]}"
+		do
+			echo "   - $file"
+		done
+}
+
+archive_listl() {
 	info "Archives:"
 
 	local list=( $(_archive_list) )
 
 	for file in "${list[@]}"
 	do
-		echo "   - $file"
+		if [[ -L $rr_archive_home/$file ]]
+		then
+			echo "   - $file -> $(readlink $rr_archive_home/$file)"
+		else
+			echo "   - $file" 
+		fi
 	done
 }
 
@@ -127,6 +156,22 @@ archive_help() {
 	error "Undefined"
 }
 
+
+(
+	archives=( $( _archive_list) )
+	for archive in "${archives[@]}"
+	do
+		if [[ -h $rr_archive_home/$archive ]]
+		then
+			target=$( readlink $rr_archive_home/$archive )
+			if [[ ! -d $target ]] 
+			then
+				rm -fr $rr_archive_home/$archive
+			fi 
+		fi 
+	done
+) || fail "Unable to cleanup archives." 
+
 # Actually perform an action on the archives.
 #
 #
@@ -136,7 +181,7 @@ archive_action() {
 	unset args[0]
 
 	case "$action" in
-		list|show|create|delete|edit|install)
+		list|listl|show|create|delete|edit|install)
 			archive_$action "${args[@]}"
 			;;
 		*)

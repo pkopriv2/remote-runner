@@ -181,7 +181,21 @@ host_edit() {
 }
 
 host_help() {
-	log_error "Undefined"
+	echo "** Host Commands **"
+	echo 
+
+	methods=( list )
+	for method in "${methods[@]}" 
+	do
+		echo "rr host $method [options]"
+	done
+
+
+	methods=( bootstrap show edit )
+	for method in "${methods[@]}" 
+	do
+		echo "rr host $method [HOST] [options]"
+	done
 }
 
 
@@ -191,7 +205,7 @@ host_action() {
 	unset args[0]
 
 	case "$action" in
-		list|bootstrap|execute|show|edit)
+		list|bootstrap|show|edit)
 			host_$action "${args[@]}"
 			;;
 		*)

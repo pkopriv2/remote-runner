@@ -1,8 +1,17 @@
 #! /bin/bash
 
-export fileserver_port
-export fileserver_pid
+require "lib/fail.sh"
 
+declare rr_requires=( ruby )
+for bin in "${rr_requires[@]}"
+do
+	if ! command -v $bin &> /dev/null
+	then
+		error "rr requires binary [$bin] to be on the path."
+	fi 
+done
+
+export fileserver_port
 fileserver_port=${fileserver_port:-5001}
 
 if [[ -z globals ]] 
