@@ -20,7 +20,17 @@ require "role.sh"
 require "archive.sh"
 require "fileserver.sh"
 
-_runtime_env() {
+# Determines the host environment.  This will set the following
+# global variables:
+# 	- key
+#   - roles
+# 
+# @param 1 - The host environment to source
+#
+_host_env() {
+	log_debug "Sourcing host environment: $1"
+
+	key="default"
 	key() {
 		key=${1:-"default"}
 	}
@@ -30,6 +40,32 @@ _runtime_env() {
 		roles+=( $* )
 	}
 
+	if [[ ! -f $rr_host_home/$1.sh ]] 
+	then
+		fail "Host file [$1] does not exist."
+	fi 
+
+	if ! source $rr_host_home/$1.sh
+	then
+		fail "Error sourcing host file [$host]"
+	fi
+
+	roles=( $(array_uniq "${roles[@]}") )
+
+	unset -f key
+	unset -f roles
+}
+
+# Given a list of roles, this method will source
+# all the role files and upadate the following global
+# attributes:
+#
+#   - attributes
+# 	- archives
+# 
+# @param 1..n - The roles to source.
+#
+_role_env() {
 	attributes=()
 	attr() {
 		attributes+=(["$1"]=$2)
@@ -40,15 +76,7 @@ _runtime_env() {
 		archives+=( $* )
 	}
 
-	if ! source $rr_host_home/$1.sh
-	then
-		fail "Error sourcing host file [$host]"
-	fi
-
-	unset -f key
-	unset -f roles
-
-	for role in "${roles[@]}"
+	for role in "${@}"
 	do
 		if [[ ! -f $rr_role_home/$role.sh ]] 
 		then
@@ -60,16 +88,44 @@ _runtime_env() {
 			fail "Error sourcing role file [$role]: $err"
 		fi
 	done
-	
 
-	archives=( $(echo "${archives[*]}" | uniq) )
-	roles=( $(echo "${roles[*]}" | uniq) )
+	archives=( $(array_uniq "${archives[@]}") )
+	log_info "Runlist has expanded to: $(array_print ${archives[@]}) "
+
+	unset -f attr
+	unset -f archives 
+}
+
+# Given a key name determine the keyfile and
+# add it to the ssh connection agent. This
+# will set the following global attributes:
+#
+# 	- key_file
+#
+# @param 1 - The name of the key
+#
+_key_env() {
+	key_file=$rr_key_home/id_rsa.$key
+
+	if [[ ! -f $key_file ]] 
+	then 
+		fail "That key file [$key_file] doesn't exist!"
+	fi
+
+	if ! ssh-add $key_file  &> /dev/null
+	then
+		fail "Unable to source the key file [$key_file]"
+	fi 
 }
 
 
+# Given the target machine, this method will print the
+# runtime library to stdout.
+#
+# @param 1 - The target host.
 _runtime_lib() {
 	cat - <<-EOH
-		server_ip=$(inet_src_ip "$(login_get_host $1)")
+	server_ip=$(inet_src_ip "$(login_get_host $1)")
 	EOH
 
 	for key in "${!attributes[@]}"
@@ -98,6 +154,60 @@ _runtime_lib() {
 	done
 }
 
+# Execute an archive
+#
+# @param 1 - The host on which to run the archive
+# @param 2 - The key file to send with the ssh request
+# @param 3 - The archive to execute
+_archive_execute() {
+	local host=$1
+	local key_file=$2
+	local archive=$3
+
+	log_info "Executing archive [$archive] on host [$host]"
+
+	local archive_name=$(_archive_get_name $archive)
+	local archive_script=$(_archive_get_script $archive)
+
+	local script=$rr_archive_home/$archive_name/scripts/$archive_script.sh
+	if [ ! -f $script ]
+	then
+		fail "Unable to locate archive [$archive]"
+	fi
+
+	fileserver_start $rr_archive_home/$archive_name/files 
+
+	{
+		_runtime_lib $host $archive
+
+		cat - <<-EOH
+			archive_name=$archive_name
+			archive_script=$archive_script
+			roles=(${roles[*]})
+		EOH
+	} | ssh -t -i $key_file $host "cat - > /tmp/rr.sh"
+
+	if [ $? -ne 0 ]
+	then
+		fail "Failed to send runtime library to host [$host]"
+	fi
+
+	{
+		echo -ne ". /tmp/rr.sh; $archive_name::$archive_script() { echo &> /dev/null;"
+		cat $script
+		echo "}; $archive_name::$archive_script;"
+	} | ssh -t -i $key_file $host "bash /dev/stdin; rm /tmp/rr.sh"
+
+	ret=$?
+
+	fileserver_stop
+
+	if [ $ret -ne 0 ]
+	then
+		fail "Failed to remote execute archive [$archive] on host [$host]"
+	fi
+}
+
 execute() {
 	if [[ $# < 1 ]]
 	then
@@ -105,69 +215,57 @@ execute() {
 		exit 1
 	fi
 
-	local host_list=( $( _host_match $1) )
+	# Determine the hosts on which this will run.
+	local host_list=()
+	for host_regexp in "${@}"
+	do
+		host_list+=( $( _host_match $host_regexp) )
+	done
+	host_list=( $(array_uniq ${host_list[@]}) )
+
 	log_info "Hosts have expanded to: $(array_print "${host_list[@]}") "
 
 	for host in "${host_list[@]}"
 	do
-		log_debug "Sourcing host environment: $host"
 
 		(
-			_runtime_env $host
+		# Source the host file.  This will set the following
+		# global variables:
+		# 	- key
+		#   - roles
+		#
+		_host_env $host
 
-			local key_file=$rr_key_home/id_rsa.$key
-			if [[ ! -f $key_file ]] 
-			then 
-				log_error "That key file [$key_file] doesn't exist!"
-				exit 1
-			fi
+		# Source the roles.  This will set the following
+		# global variables:
+		#   - attributes
+		#   - archives
+		#
+		_role_env ${roles[@]}
 
-			ssh-add $key_file 
+		# Check to see if any archives have been applied to
+		# this host.  If not, then we don't need to continue
+		if [[ ${#archives} == 0 ]] 
+		then
+			log_info "No archives to execute."
+			exit 0
+		fi
 
-			log_info "Runlist has expanded to: $(array_print ${archives[@]}) "
+		# Determine the necessary ssh key to use to 
+		# run on this host.  Add the identity file
+		# to limit the number of times that the passphrase
+		# is requested. This will set the following 
+		# global variables:
+		# 	- key_file
+		#
+		_key_env $key
 
-			for archive in "${archives[@]}"
-			do
-				log_info "Executing archive [$archive] on host [$host]"
+		for archive in "${archives[@]}"
+		do
+			_archive_execute $host $key_file $archive
+		done
 
-				local archive_name=$(_archive_get_name $archive)
-				local archive_script=$(_archive_get_script $archive)
-				local script=$rr_archive_home/$archive_name/scripts/$archive_script.sh
-
-				if [ ! -f $script ]
-				then
-					log_error "Unable to locate archive [$archive]"
-					exit 1
-				fi
-
-				fileserver_start $rr_archive_home/$archive_name/files 
-
-				{
-					_runtime_lib $host $archive
-
-					cat -<<-EOH
-						archive_name=$archive_name
-						archive_script=$archive_script
-						roles=(${roles[*]})
-					EOH
-				} | ssh -t -i $key_file $host "cat - > /tmp/rr.sh"
-
-				{
-					echo -ne ". /tmp/rr.sh; $archive_name::$archive_script() { echo &> /dev/null;"
-					cat $script
-					echo "}; $archive_name::$archive_script;"
-				} | ssh -t -i $key_file $host "bash /dev/stdin; rm /tmp/rr.sh"
-
-				ret=$?
-
-				fileserver_stop
-
-				if [ $ret -ne 0 ]
-				then
-					exit 1
-				fi
-			done
-		) || fail "Error executing host [$1] runlist."
+		) || fail "Error executing host [$host] runlist."
 	done
 }
 

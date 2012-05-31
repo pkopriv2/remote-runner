@@ -20,3 +20,7 @@ array_print() {
 
 	echo ")"
 }
+
+array_uniq() {
+	echo "${*}" | uniq
+}
