@@ -2,8 +2,9 @@
 
 export rr_home=${rr_home:-$HOME/.rr}
 export rr_host_home=${rr_host_home:-$rr_home/hosts}
-
-IFS=$'\n'
+export rr_archive_home=${rr_archive_home:-$rr_home/archives}
+export rr_role_home=${rr_role_home:-$rr_home/roles}
+export rr_sudo=${rr_sudo:false}
 
 source $rr_home/local/require.sh
 
@@ -14,11 +15,14 @@ require "lib/login.sh"
 require "lib/inet.sh"
 require "lib/array.sh"
 require "local/log.sh"
+require "local/msg.sh"
 require "host.sh"
 require "key.sh"
 require "role.sh"
 require "archive.sh"
 require "fileserver.sh"
+
+IFS=$'\n'
 
 # Determines the host environment.  This will set the following
 # global variables:
@@ -90,7 +94,6 @@ _role_env() {
 	done
 
 	archives=( $(array_uniq "${archives[@]}") )
-	log_info "Runlist has expanded to: $(array_print ${archives[@]}) "
 
 	unset -f attr
 	unset -f archives 
@@ -159,12 +162,12 @@ _runtime_lib() {
 # @param 1 - The host on which to run the archive
 # @param 2 - The key file to send with the ssh request
 # @param 3 - The archive to execute
-_archive_execute() {
+_archive_transfer() {
 	local host=$1
 	local key_file=$2
 	local archive=$3
 
-	log_info "Executing archive [$archive] on host [$host]"
+	log_info "Transferring archive [$archive] to host [$host]"
 
 	local archive_name=$(_archive_get_name $archive)
 	local archive_script=$(_archive_get_script $archive)
@@ -175,8 +178,6 @@ _archive_execute() {
 		fail "Unable to locate archive [$archive]"
 	fi
 
-	fileserver_start $rr_archive_home/$archive_name/files 
-
 	{
 		_runtime_lib $host $archive
 
@@ -185,7 +186,7 @@ _archive_execute() {
 			archive_script=$archive_script
 			roles=(${roles[*]})
 		EOH
-	} | ssh -t -i $key_file $host "cat - > /tmp/rr.sh"
+	} | ssh -i $key_file $host "cat - > /tmp/rr.sh"
 
 	if [ $? -ne 0 ]
 	then
@@ -196,7 +197,31 @@ _archive_execute() {
 		echo -ne ". /tmp/rr.sh; $archive_name::$archive_script() { echo &> /dev/null;"
 		cat $script
 		echo "}; $archive_name::$archive_script;"
-	} | ssh -t -i $key_file $host "bash /dev/stdin; rm /tmp/rr.sh"
+	} | ssh -i $key_file $host "cat - > /tmp/$archive.sh"
+
+	if [ $? -ne 0 ]
+	then
+		fail "Failed to send archive to host [$host]"
+	fi
+}
+
+_archive_execute() {
+	local host=$1
+	local key_file=$2
+	local archive=$3
+
+	log_info "Executing archive [$archive] on host [$host]"
+	
+	local archive_name=$(_archive_get_name $archive)
+
+	fileserver_start $rr_archive_home/$archive_name/files 
+
+	if $rr_sudo
+	then 
+		ssh -t -i $key_file $host "sudo bash /tmp/$archive.sh"
+	else
+		ssh -i $key_file $host "bash /tmp/$archive.sh"
+	fi
 
 	ret=$?
 
@@ -206,28 +231,46 @@ _archive_execute() {
 	then
 		fail "Failed to remote execute archive [$archive] on host [$host]"
 	fi
+
 }
 
 execute() {
 	if [[ $# < 1 ]]
 	then
-		log_error "Must provide a host regexp."
+		error "Must provide a host regexp."
 		exit 1
 	fi
 
+	while getopts ":l:a:p:s" opt 
+	do
+		case $opt in
+			l)
+				log_level=$OPTARG
+				;;
+			a) 
+				archive+=( $OPTARG )
+				;;
+			p) 
+				rr_archive_home=$OPTARG 
+				;;
+			s)
+				rr_sudo=true 
+		esac 
+	done
+
 	# Determine the hosts on which this will run.
 	local host_list=()
+
 	for host_regexp in "${@}"
 	do
 		host_list+=( $( _host_match $host_regexp) )
 	done
+
 	host_list=( $(array_uniq ${host_list[@]}) )
 
 	log_info "Hosts have expanded to: $(array_print "${host_list[@]}") "
-
 	for host in "${host_list[@]}"
 	do
-
 		(
 		# Source the host file.  This will set the following
 		# global variables:
@@ -242,6 +285,14 @@ execute() {
 		#   - archives
 		#
 		_role_env ${roles[@]}
+
+		if [[ -n $archive ]]
+		then
+			archives=( "${archive[@]}" )
+		fi
+		
+		log_info "Runlist has expanded to: $(array_print ${archives[@]}) "
+	
 
 		# Check to see if any archives have been applied to
 		# this host.  If not, then we don't need to continue
@@ -262,6 +313,7 @@ execute() {
 
 		for archive in "${archives[@]}"
 		do
+			_archive_transfer $host $key_file $archive
 			_archive_execute $host $key_file $archive
 		done
 
@@ -270,7 +322,17 @@ execute() {
 }
 
 help() {
-	log_error "Undefined"
+	info "** Global Commands **"
+	echo 
+	echo "rr [options] [HOST] [HOST]*"
+	echo
+
+	local subcommands=( key host role archive )
+	for cmd in "${subcommands[@]}" 
+	do
+		"$cmd"_help
+		echo 
+	done
 }
 
 

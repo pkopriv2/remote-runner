@@ -1,6 +1,6 @@
 #! /bin/bash
 
-require "local/log.sh"
+require "local/msg.sh"
 require "lib/dir.sh"
 
 rr_role_home=${rr_role_home:-$rr_home/roles}
@@ -21,8 +21,12 @@ role_create() {
 	fi
 
 	info "Creating role [$role_name]"
-	touch $role_file 
-	info "Successfully created role [$role_name]"
+	if touch $role_file
+	then
+		info "Successfully created role [$role_name]"
+	else
+		error "Error creating role [$role_name]"
+	fi
 }
 
 # Edit a role file with the environment $EDITOR program
@@ -100,7 +104,20 @@ role_list() {
 
 
 role_help() {
-	error "Undefined"
+	info "** Role Commands **"
+	echo 
+
+	methods=( list create )
+	for method in "${methods[@]}" 
+	do
+		echo "rr role $method [options]*"
+	done
+
+	methods=( show edit delete )
+	for method in "${methods[@]}" 
+	do
+		echo "rr role $method [options]* [ROLE]"
+	done
 }
 
 # Actually perform an action on the roles.

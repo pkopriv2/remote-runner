@@ -2,7 +2,7 @@
 
 export rr_archive_home
 
-require "local/log.sh"
+require "local/msg.sh"
 require "lib/dir.sh"
 require "lib/fail.sh" 
 
@@ -44,7 +44,7 @@ archive_install() {
 
 	path=$(builtin cd $1; pwd)
 
-	if ! ln -s $path $rr_archive_home
+	if ! ln -s $path $rr_archive_home &> /dev/null
 	then
 		error "Error installing archive [$1]."
 		exit 1
@@ -153,9 +153,21 @@ _archive_list() {
 
 
 archive_help() {
-	error "Undefined"
-}
+	info "** Archive Commands **"
+	echo 
 
+	methods=( list create )
+	for method in "${methods[@]}" 
+	do
+		echo "rr archive $method [options]*"
+	done
+
+	methods=( show edit install delete )
+	for method in "${methods[@]}" 
+	do
+		echo "rr archive $method [options]* [ARCHIVE]"
+	done
+}
 
 (
 	archives=( $( _archive_list) )

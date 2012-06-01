@@ -3,7 +3,7 @@
 require "lib/login.sh"
 require "lib/user.sh"
 require "lib/host.sh"
-require "local/log.sh"
+require "local/msg.sh"
 require "key.sh"
 
 rr_host_home=${rr_host_home:-$rr_home/hosts}
@@ -38,7 +38,7 @@ _host_list() {
 _host_match() {
 	if [[ -z $1 ]]
 	then
-		log_error "Must supply a non-empty regexp"
+		error "Must supply a non-empty regexp"
 		exit 1
 	fi 
 
@@ -81,14 +81,14 @@ _ssh_bootstrap() {
 	local user=$(login_get_user "$1" 2> /dev/null)
 	if [[ -z $user ]]
 	then
-		log_error "Unable to determine user from login [$1]"
+		error "Unable to determine user from login [$1]"
 		exit 1
 	fi
 
-	local pub_key=$(key_get "$2" 2> /dev/null)
+	local pub_key=$(key_show "$2" 2> /dev/null)
 	if [[ -z $pub_key ]]
 	then 
-		log_error "Unable to determine value of public key [$2]"
+		error "Unable to determine value of public key [$2]"
 		exit 1
 	fi
 
@@ -119,7 +119,7 @@ EOH
 host_bootstrap() {
 	if [[ $# -lt 1 ]]
 	then
-		log_error "Must provide a host to bootstrap"
+		error "Must provide a host to bootstrap"
 		exit 1
 	fi
 
@@ -128,13 +128,13 @@ host_bootstrap() {
 
 	if ! _ssh_bootstrap "$login" "$key_name"
 	then
-		log_error "Unable to copy ssh keys."
+		error "Unable to copy ssh keys."
 		exit 1
 	fi
 
 	if ! _file_bootstrap "$login" "$key_name" 
 	then
-		log_error "Unable to bootstrap local host file."
+		error "Unable to bootstrap local host file."
 		exit 1
 	fi
 }
@@ -144,14 +144,14 @@ host_bootstrap() {
 host_show() {
 	if [[ $# != 1 ]]
 	then
-		log_error "Must provide a login"
+		error "Must provide a login"
 		exit 1
 	fi
 
 	local login=$(login "$1")
 	if [[ ! -f $rr_host_home/$login.sh ]] 
 	then
-		log_error "That host [$login] has not been bootstrapped"
+		error "That host [$login] has not been bootstrapped"
 		exit 1
 	fi
 
@@ -165,14 +165,14 @@ host_show() {
 host_edit() {
 	if [[ $# != 1 ]]
 	then
-		log_error "Must provide a login"
+		error "Must provide a login"
 		exit 1
 	fi
 
 	local login=$(login "$1")
 	if [[ ! -f $rr_host_home/$login.sh ]] 
 	then
-		log_error "That host [$login] has not been bootstrapped"
+		error "That host [$login] has not been bootstrapped"
 		exit 1
 	fi
 
@@ -181,7 +181,7 @@ host_edit() {
 }
 
 host_help() {
-	echo "** Host Commands **"
+	info "** Host Commands **"
 	echo 
 
 	methods=( list )
@@ -190,11 +190,10 @@ host_help() {
 		echo "rr host $method [options]"
 	done
 
-
 	methods=( bootstrap show edit )
 	for method in "${methods[@]}" 
 	do
-		echo "rr host $method [HOST] [options]"
+		echo "rr host $method [options] [HOST]"
 	done
 }
 

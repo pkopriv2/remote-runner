@@ -1,17 +1,35 @@
 #! /bin/bash
 
-nc_cmd=${nc_cmd:-nc}
-if command -v nc.traditional $> /dev/null
+nc_cmds=( nc nc.traditional )
+for cmd in "${nc_cmds[@]}"
+do
+	if command -v $cmd &> /dev/null
+	then
+		nc_cmd=$cmd
+	fi
+done
+
+if  [[ -z $nc_cmd ]]
 then
-	nc_cmd=nc.traditional
+	case $distro in
+		Ubuntu|Debian)
+			package_require "netcat-traditional" 
+			;;
+		*)
+			log_error "Unable to install netcat."
+	esac 
 fi
 
-
 archive_file() {
+	if  [[ -z $nc_cmd ]]
+	then
+		fail "Unable to locate netcat."
+	fi
+
+
 	if [[ -z $1 ]]
 	then
-		log_error "Must supply a file name."
-		exit 1 
+		fail "Must supply a file name."
 	fi 
 
 	log_info "Processing archive_file file [$1]"

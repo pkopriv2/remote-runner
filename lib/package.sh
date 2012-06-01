@@ -1,10 +1,12 @@
+require "lib/fail.sh"
+
 if command -v dpkg &>/dev/null
 then
 	package_require() {
-		if ! _package_installed $1
+		if ! package_installed $1
 		then
-			error "Packaged [$1] is required but is not installed"
-			exit 1
+			package_install $1 || \
+				fail "Package [$1] is required but is not installed"
 		fi
 	}
 
@@ -12,11 +14,16 @@ then
 		echo $(dpkg -s $1) | grep "Status: install ok" > /dev/null && return $?
 	}
 
-	#_package_install() {
-		#_package_installed && return 0
-	
-	#}
+	package_install() {
+		package_installed $1 && return 0
+		
+		if ! command -v apt-get &> /dev/null
+		then
+			fail "apt-get is required to install packages."
+		fi 
+
+		echo "Y" | apt-get install $1
+	}
 else
-	
 	echo > /dev/null
 fi

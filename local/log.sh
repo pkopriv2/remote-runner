@@ -1,31 +1,30 @@
 #! /bin/bash
 
-info() {
-	if ! tput setaf &> /dev/null
-	then
-		echo -e "$1"
-	else
-		echo -e "$(tput setaf 2)$1$(tput sgr0)"
-	fi
-}
+require "lib/array.sh"
 
-error() {
-	if ! tput setaf &> /dev/null
-	then
-		echo -e "$1 >&2"
-	else
-		echo -e "$(tput setaf 1)$1$(tput sgr0)"
-	fi
-}
+log_level=${log_level:-DEBUG}
 
+
+debug_levels=( DEBUG )
 log_debug() {
+	if ! array_contains "$log_level" "${debug_levels[@]}" 
+	then
+		return 0
+	fi
+
 	echo -e "[LOCAL:$(caller 0)] [DEBUG]: $1"
 }
 
 # Logs a message out in a friendly green color if 
 # a tty has been allocated.
 #
+info_levels=( DEBUG INFO )
 log_info() {
+	if ! array_contains "$log_level" "${info_levels[@]}" 
+	then
+		return 0
+	fi
+
 	if ! tput setaf &> /dev/null
 	then
 		echo -e "[LOCAL:$(caller 0)] [INFO]: $1"
@@ -38,7 +37,13 @@ log_info() {
 # The use should clearly know that something
 # has gone wrong.
 #
+error_levels=( DEBUG INFO ERROR )
 log_error() {
+	if ! array_contains "$log_level" "${error_levels[@]}" 
+	then
+		return 0
+	fi
+
 	if ! tput setaf &> /dev/null
 	then
 		echo [LOCAL:$(caller 0)]: $1 >&2

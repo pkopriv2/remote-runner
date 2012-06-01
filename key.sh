@@ -1,14 +1,14 @@
 #! /bin/bash
 
-require "local/log.sh"
 require "lib/dir.sh"
+require "local/msg.sh"
 
 rr_key_home=${rr_key_home:-$rr_home/keys}
 dir_create_if_missing "$rr_key_home"
 
 # Generate a public/private key pair
 # 
-# @param name The name of the key pair [default="default"]
+# @param $1 The name of the key pair [default="default"]
 #
 key_create() {
 	local key_name=${1:-"default"}
@@ -38,7 +38,7 @@ key_create() {
 # Get the value of a public key
 #
 # @param name The name of the key [default="default"]
-key_get() {
+key_show() {
 	local key_name=${1:-"default"}
 	local key_file=$rr_key_home/id_rsa.$key_name.pub
 	if [[ ! -f $key_file ]]
@@ -91,7 +91,20 @@ key_list() {
 
 
 key_help() {
-	error "Undefined"
+	info "** Key Commands **"
+	echo 
+
+	methods=( list create )
+	for method in "${methods[@]}" 
+	do
+		echo "rr key $method [options]*"
+	done
+
+	methods=( show delete )
+	for method in "${methods[@]}" 
+	do
+		echo "rr key $method [options]* [KEY]"
+	done
 }
 
 # Actually perform an action on the keys.
@@ -103,7 +116,7 @@ key_action() {
 	unset args[0]
 
 	case "$action" in
-		list|get|create|delete)
+		list|show|create|delete)
 			key_$action "${args[@]}"
 			;;
 		*)

@@ -22,5 +22,10 @@ array_print() {
 }
 
 array_uniq() {
-	echo "${*}" | uniq
+	(
+		for e in "${@}"
+		do 
+			echo "$e"
+		done 
+	) | sort | uniq
 }
