@@ -1,3 +1,13 @@
 #! /bin/bash
 
-rr -s "${@}"
+args=($*)
+action="${args[0]}"
+
+case "$action" in
+	key|host|role|archive)
+		rr "${@}"
+		;;
+	*)
+		rr -s "${@}"
+		;;
+esac 

@@ -2,14 +2,17 @@
 
 require "lib/fail.sh"
 
-declare rr_requires=( ruby )
-for bin in "${rr_requires[@]}"
-do
-	if ! command -v $bin &> /dev/null
-	then
-		error "rr requires binary [$bin] to be on the path."
-	fi 
-done
+(
+	declare rr_requires=( ruby )
+	for bin in "${rr_requires[@]}"
+	do
+		if ! command -v $bin &> /dev/null
+		then
+			error "rr requires binary [$bin] to be on the path."
+			exit 1
+		fi 
+	done
+) || exit 1
 
 export fileserver_port
 fileserver_port=${fileserver_port:-5001}
@@ -52,11 +55,12 @@ base_path=base_path.gsub(/\/$/, '')
 server = TCPServer.open($fileserver_port)   
 while true 
 	Thread.start(server.accept) do |client|
-		file = client.readline.chop
+		entry = client.readline.chop
 
-		#puts "Processing download: #{file}"
+		archive_name = entry.split("::")[0]
+		archive_file = entry.split("::")[1]
 
-		full_path="#{base_path}/#{file}"
+		full_path = "#{base_path}/#{archive_name}/files/#{archive_file}"
 
 	 	unless File.exists?(full_path)
 			client.close()
@@ -66,7 +70,6 @@ while true
 		client.close
 	end
 end	
-
 EOF
 	# Start the fileserver
 	ruby /tmp/fileserver.rb &

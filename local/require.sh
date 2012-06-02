@@ -17,5 +17,5 @@ require() {
 		return
 	fi
 	
-	. $script  && requires["$script"]="1"
+	. $script && requires["$script"]="1"
 }

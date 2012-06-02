@@ -1,3 +1,8 @@
+export rr_home=${rr_home:-$HOME/.rr}
+export rr_host_home=${rr_host_home:-$rr_home/hosts}
+export rr_archive_home=${rr_archive_home:-$rr_home/archives}
+export rr_role_home=${rr_role_home:-$rr_home/roles}
+
 _rrcd_complete() {
 	local cur=${COMP_WORDS[COMP_CWORD]}
 	local prev=${COMP_WORDS[COMP_CWORD-1]}
@@ -18,7 +23,7 @@ complete -F _rrcd_complete rrcd
 _rr_complete() {
 	local cur=${COMP_WORDS[COMP_CWORD]}
 	local cmd=""
-	local index=0
+	local index=1
 	while (( index < COMP_CWORD )) 
 	do
 		cmd+=":${COMP_WORDS[index]}"
@@ -28,38 +33,38 @@ _rr_complete() {
 	COMPREPLY=()   
 
 	case "$cmd" in
-		:rr) 
+		"") 
 			local hosts=($(builtin cd "$rr_host_home" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
-			COMPREPLY=( $( compgen -W "${hosts[@]} archive host key role" -- $cur ) )
+			COMPREPLY=( $( compgen -W '${hosts[@]} archive host key role' -- $cur ) )
 			;;
-		:rr:-) 
-			COMPREPLY=( $( compgen -W '-a -l -p' -- $cur ) )
-			;;
-		:rr:archive)
+		#:rr:-) 
+			#COMPREPLY=( $( compgen -W '-a -l -p' -- $cur ) )
+			#;;
+		:archive)
 			COMPREPLY=( $( compgen -W 'create delete install list' -- $cur ) )
 			;;
-		:rr:archive:delete)
+		:archive:delete)
 			local archives=( $(builtin cd "$rr_archive_home" ; find . -maxdepth 1 -mindepth 1 | sed 's|^\.\/||' | sort ) )
 			COMPREPLY=( $( compgen -W '${archives[@]}' -- $cur ) )
 			;;
-		:rr:host)
+		:host)
 			COMPREPLY=( $( compgen -W 'show list edit bootstrap' -- $cur ) )
 			;;
-		:rr:host:show|:rr:host:edit)
+		:host:show|:host:edit)
 			local hosts=($(builtin cd "$rr_host_home" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
 			COMPREPLY=( $( compgen -W '${hosts[@]}' -- $cur ) )
 			;;
-		:rr:key)
+		:key)
 			COMPREPLY=( $( compgen -W 'create delete list show' -- $cur ) )
 			;;
-		:rr:key:show|:rr:key:delete)
+		:key:show|:key:delete)
 			local keys=($(builtin cd "$rr_key_home" ; find . -maxdepth 1 -mindepth 1 -name 'id_rsa.*.pub' -print | sed 's|\.\/id_rsa\.\([^\.]*\)\.pub|\1|' | sort ))
 			COMPREPLY=( $( compgen -W '${keys[@]}' -- $cur ) )
 			;;
-		:rr:role)
+		:role)
 			COMPREPLY=( $( compgen -W 'create delete list show edit' -- $cur ) )
 			;;
-		:rr:role:show|:rr:role:delete|:rr:role:edit)
+		:role:show|:role:delete|:role:edit)
 			local roles=($(builtin cd "$rr_role_home" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
 			COMPREPLY=( $( compgen -W '${roles[@]}' -- $cur ) )
 			;;
@@ -68,3 +73,4 @@ _rr_complete() {
 }
 
 complete -F _rr_complete rr 
+complete -F _rr_complete rrsudo

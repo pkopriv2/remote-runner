@@ -3,6 +3,15 @@
 
 # Installs the specified package.
 package() {	
-	log_info "Installing package [$1]"
-	echo "Y" | apt-get install "$1"
+	log_info "Processing package [$1]"
+
+	local action="install"
+	action() {
+		action=$1
+	}
+
+	. /dev/stdin
+
+	unset -f action
+	package_"$action" $1
 }

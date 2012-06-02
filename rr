@@ -4,7 +4,6 @@ export rr_home=${rr_home:-$HOME/.rr}
 export rr_host_home=${rr_host_home:-$rr_home/hosts}
 export rr_archive_home=${rr_archive_home:-$rr_home/archives}
 export rr_role_home=${rr_role_home:-$rr_home/roles}
-export rr_sudo=${rr_sudo:false}
 
 source $rr_home/local/require.sh
 
@@ -23,6 +22,7 @@ require "archive.sh"
 require "fileserver.sh"
 
 IFS=$'\n'
+unalias "rm" &> /dev/null
 
 # Determines the host environment.  This will set the following
 # global variables:
@@ -32,7 +32,7 @@ IFS=$'\n'
 # @param 1 - The host environment to source
 #
 _host_env() {
-	log_debug "Sourcing host environment: $1"
+	log_info "Sourcing host environment: $1"
 
 	key="default"
 	key() {
@@ -157,71 +157,122 @@ _runtime_lib() {
 	done
 }
 
-# Execute an archive
+# Copy over the runtime library to a particular
+# host.  This will copy an archive to the
+# remote host to: /tmp/archive.sh
+# 
+# The archive will consist of the following scripts:
+# 	- rr.sh - The runtime library.
+#   - archive_name::archive_script.sh - The archive script.  There 
+# 		will be one for each archive that will be executed on the
+# 		host
+# 	- execute.sh - A script to actually execute the archives,
+# 		and perform cleanup.	
 #
-# @param 1 - The host on which to run the archive
-# @param 2 - The key file to send with the ssh request
-# @param 3 - The archive to execute
-_archive_transfer() {
+# @param 1 - The host to which to transfer.
+# @param 2 - The identity key to use
+# @param 3..n - The archives to include in the copy.
+_remote_lib_copy() {
 	local host=$1
 	local key_file=$2
-	local archive=$3
+	local archives=( ${@:3} )
 
-	log_info "Transferring archive [$archive] to host [$host]"
-
-	local archive_name=$(_archive_get_name $archive)
-	local archive_script=$(_archive_get_script $archive)
-
-	local script=$rr_archive_home/$archive_name/scripts/$archive_script.sh
-	if [ ! -f $script ]
-	then
-		fail "Unable to locate archive [$archive]"
-	fi
+	log_info "Building archive library from archives: $(array_print ${archives[@]})"
 
 	{
-		_runtime_lib $host $archive
+		_runtime_lib $host
+	} | tee /tmp/lib.sh | cat - > /tmp/rr.sh || fail "Failed to build runtime lib"
 
-		cat - <<-EOH
-			archive_name=$archive_name
-			archive_script=$archive_script
-			roles=(${roles[*]})
-		EOH
-	} | ssh -i $key_file $host "cat - > /tmp/rr.sh"
+	(
+		builtin cd /tmp	
+		tar -cf $host.tar rr.sh 
+		local ret=$?
+		rm -f rr.sh
+		exit $ret
+	) || fail "Unable to build library tar."
 
-	if [ $? -ne 0 ]
-	then
-		fail "Failed to send runtime library to host [$host]"
-	fi
+	for archive in "${archives[@]}"
+	do
+		log_debug "Building archive script [$archive]"
 
-	{
-		echo -ne ". /tmp/rr.sh; $archive_name::$archive_script() { echo &> /dev/null;"
-		cat $script
-		echo "}; $archive_name::$archive_script;"
-	} | ssh -i $key_file $host "cat - > /tmp/$archive.sh"
+		local archive_name=$(_archive_get_name $archive)
+		local archive_script=$(_archive_get_script $archive)
+		local script=$rr_archive_home/$archive_name/scripts/$archive_script.sh
 
-	if [ $? -ne 0 ]
-	then
-		fail "Failed to send archive to host [$host]"
-	fi
+		if [ ! -f $script ]
+		then
+			fail "Unable to locate archive [$archive]"
+		fi
+
+		{
+			echo -ne ". /tmp/rr.sh; $archive_name::$archive_script() { archive_name=$archive_name;"
+			cat $script
+			echo "}; $archive_name::$archive_script;"
+		} | cat - > /tmp/$archive_name::$archive_script.sh || fail "Failed to build archive script [$archive]"
+
+		(
+			builtin cd /tmp	
+			tar -f $host.tar --append $archive_name::$archive_script.sh 
+			local ret=$?
+			rm -f $archive_name::$archive_script.sh
+			exit $ret
+		) || fail "Unable to build library tar."
+
+		cmd+="if [[ -z \$ret ]] || [[ \$ret -eq 0 ]]; then bash /tmp/$archive_name::$archive_script.sh; ret=\$?; fi; rm /tmp/$archive_name::$archive_script.sh; " 
+	done
+
+	cmd+="rm /tmp/rr.sh; exit \$ret"
+
+	log_debug "Building execute script."
+
+	(
+		echo "$cmd" > /tmp/execute.sh
+		builtin cd /tmp
+		tar -f $host.tar --append execute.sh 
+		ret=$?
+		rm -f /tmp/execute.sh
+		exit $ret
+	) || fail "Unable to build execute script."
+
+
+	log_debug "Copying library to remote host [$host]"
+
+	(
+		scp -i $key_file /tmp/$host.tar $host:/tmp/archive.tar
+		ret=$?
+		rm -f /tmp/$host.tar 
+		exit $ret
+	) || fail "Error transferring archives to host [$host]"
 }
 
-_archive_execute() {
+# Execute the archive on the remote host. This function assumes
+# that the archive has been copied to the location at
+# /tmp/archive.sh and when expanded has a script called
+# execute.sh.
+#
+# @param 1 - The host to which to transfer.
+# @param 2 - The identity key to use
+# @param 3..n - The archives to include in the copy.
+_remote_lib_execute() {
 	local host=$1
 	local key_file=$2
-	local archive=$3
+	local archives=( ${@:3} )
 
-	log_info "Executing archive [$archive] on host [$host]"
-	
-	local archive_name=$(_archive_get_name $archive)
+	log_info "Executing archives on host [$host] : $( array_print ${archives[@]} )"
 
-	fileserver_start $rr_archive_home/$archive_name/files 
-
-	if $rr_sudo
-	then 
-		ssh -t -i $key_file $host "sudo bash /tmp/$archive.sh"
-	else
-		ssh -i $key_file $host "bash /tmp/$archive.sh"
+	local cmd="tar -xf /tmp/archive.tar -C /tmp && "
+	if [[ -n $rr_sudo ]] && $rr_sudo 
+	then
+		cmd+="sudo "
 	fi
+
+	cmd+="bash /tmp/execute.sh; "
+	cmd+="ret=\$?; rm /tmp/archive.tar /tmp/execute.sh; exit \$ret"
+	
+	fileserver_start $rr_archive_home \
+		|| fail "Error starting fileserver"
+
+	ssh -t -i $key_file $host "$cmd"
 
 	ret=$?
 
@@ -229,9 +280,8 @@ _archive_execute() {
 
 	if [ $ret -ne 0 ]
 	then
-		fail "Failed to remote execute archive [$archive] on host [$host]"
+		fail "Failed to remote execute archives on host [$host]: $( array_print ${archives[@]} )"
 	fi
-
 }
 
 execute() {
@@ -258,14 +308,11 @@ execute() {
 		esac 
 	done
 
-	# Determine the hosts on which this will run.
 	local host_list=()
-
 	for host_regexp in "${@}"
 	do
 		host_list+=( $( _host_match $host_regexp) )
 	done
-
 	host_list=( $(array_uniq ${host_list[@]}) )
 
 	log_info "Hosts have expanded to: $(array_print "${host_list[@]}") "
@@ -290,9 +337,9 @@ execute() {
 		then
 			archives=( "${archive[@]}" )
 		fi
-		
+
 		log_info "Runlist has expanded to: $(array_print ${archives[@]}) "
-	
+
 
 		# Check to see if any archives have been applied to
 		# this host.  If not, then we don't need to continue
@@ -311,18 +358,17 @@ execute() {
 		#
 		_key_env $key
 
-		for archive in "${archives[@]}"
-		do
-			_archive_transfer $host $key_file $archive
-			_archive_execute $host $key_file $archive
-		done
+		_remote_lib_copy $host $key_file "${archives[@]}"
+		_remote_lib_execute $host $key_file "${archives[@]}"
 
 		) || fail "Error executing host [$host] runlist."
 	done
 }
 
+
 help() {
 	info "** Global Commands **"
+
 	echo 
 	echo "rr [options] [HOST] [HOST]*"
 	echo

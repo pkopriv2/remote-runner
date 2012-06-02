@@ -24,6 +24,17 @@ then
 
 		echo "Y" | apt-get install $1
 	}
+
+	package_remove() {
+		package_installed $1 || return 0
+
+		if ! command -v apt-get &> /dev/null
+		then
+			fail "apt-get is required to remove packages."
+		fi 
+
+		echo "Y" | apt-get remove $1 
+	}
 else
-	echo > /dev/null
+	fail "Your os is not supported."
 fi

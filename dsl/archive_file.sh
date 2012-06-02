@@ -16,7 +16,7 @@ then
 			package_require "netcat-traditional" 
 			;;
 		*)
-			log_error "Unable to install netcat."
+			log_error "Unable to install netcat.  This will cause attempts to call archive_file to fail."
 	esac 
 fi
 
@@ -26,6 +26,10 @@ archive_file() {
 		fail "Unable to locate netcat."
 	fi
 
+	if [[ -z $archive_name ]]
+	then
+		fail "Unknown archive."
+	fi 
 
 	if [[ -z $1 ]]
 	then
@@ -33,7 +37,6 @@ archive_file() {
 	fi 
 
 	log_info "Processing archive_file file [$1]"
-
 
 	local src=""
 	src() {
@@ -46,8 +49,8 @@ archive_file() {
 	}
 
 	local group="$USER"
-	owner() {
-		owner=$1
+	group() {
+		group=$1
 	}
 
 	local permissions="644"
@@ -58,7 +61,9 @@ archive_file() {
 	. /dev/stdin
 
 	eval "path=$1"
-	echo $src | $nc_cmd $server_ip $fileserver_port > $path
+	log_debug "Path has expanded to: [$path]"
+
+	echo "$archive_name::$src" | $nc_cmd $server_ip $fileserver_port > $path
 	if (( $? )) 
 	then
 		log_error "Error downloading file [$src] and creating file [$1]"
