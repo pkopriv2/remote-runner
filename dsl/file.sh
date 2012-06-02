@@ -5,7 +5,7 @@ file() {
 
 	local contents=""
 	contents() {
-		contents=$(cat)
+		contents=$(cat -)
 	}
 
 	local owner="$USER"
