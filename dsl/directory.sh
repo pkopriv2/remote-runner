@@ -1,7 +1,5 @@
 #! /bin/bash
 
-# Provides a useful dsh method that will easily create
-#
 directory() {
 	log_info "Processing directory [$1]"
 
@@ -25,27 +23,27 @@ directory() {
 		permissions=$1
 	}
 
-
-
-	. /dev/stdin
-
-	if ! mkdir -p $1 1> /dev/null
+	if ! test -t 0
 	then
-		log_error "Error creating directory [$1]"
+		. /dev/stdin
+	fi
+
+	eval "path=$1"
+	if ! mkdir -p $path 1> /dev/null
+	then
+		log_error "Error creating directory [$path]"
 		exit 1
 	fi
 
-	if ! chown $owner:$group $1 
+	if ! chown $owner:$group $path 
 	then
-		log_error "Error setting ownership of directory [$1]" 
+		log_error "Error setting ownership of directory [$path]" 
 		exit 1
 	fi
 
-	if ! chmod $permissions $1
+	if ! chmod $permissions $path
 	then
-		log_error "Error setting permissions of directory [$1]"
+		log_error "Error setting permissions of directory [$path]"
 		exit 1
 	fi
-
-	echo "$contents" | cat > $1
 }

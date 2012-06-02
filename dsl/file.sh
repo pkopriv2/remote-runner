@@ -1,7 +1,5 @@
 #! /bin/bash
 
-# Provides a useful dsh method that will easily create
-#
 file() {
 	log_info "Creating file [$1]"
 
@@ -25,25 +23,29 @@ file() {
 		permissions=$1
 	}
 
-	. /dev/stdin
-
-	if ! touch $1 1> /dev/null
+	if ! test -t 0
 	then
-		log_error "Error creating file [$1]"
+		. /dev/stdin
+	fi
+
+	eval "path=$1"
+	if ! touch $path 1> /dev/null
+	then
+		log_error "Error creating file [$path]"
 		exit 1
 	fi
 
-	if ! chown $owner:$group $1 
+	if ! chown $owner:$group $path 
 	then
-		log_error "Error setting ownership of file [$1]" 
+		log_error "Error setting ownership of file [$path]" 
 		exit 1
 	fi
 
-	if ! chmod $permissions $1
+	if ! chmod $permissions $path
 	then
-		log_error "Error setting permissions of file [$1]"
+		log_error "Error setting permissions of file [$path]"
 		exit 1
 	fi
 
-	echo "$contents" | cat > $1
+	echo "$contents" | cat > $path
 }
