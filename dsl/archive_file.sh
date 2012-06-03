@@ -1,6 +1,6 @@
 #! /bin/bash
 
-nc_cmds=( nc nc.traditional )
+nc_cmds=( nc.traditional )
 for cmd in "${nc_cmds[@]}"
 do
 	if command -v $cmd &> /dev/null
