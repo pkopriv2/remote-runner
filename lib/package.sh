@@ -36,5 +36,5 @@ then
 		echo "Y" | apt-get remove $1 
 	}
 else
-	fail "Your os is not supported."
+	log_info "Your os package manager is not supported.  Calls to package_x will fail."
 fi
