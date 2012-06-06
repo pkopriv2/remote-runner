@@ -1,31 +1,8 @@
 #! /bin/bash
 
-nc_cmds=( nc.traditional )
-for cmd in "${nc_cmds[@]}"
-do
-	if command -v $cmd &> /dev/null
-	then
-		nc_cmd=$cmd
-	fi
-done
-
-if  [[ -z $nc_cmd ]]
-then
-	case $distro in
-		Ubuntu|Debian)
-			package_require "netcat-traditional" 
-			;;
-		*)
-			log_error "Unable to install netcat.  This will cause attempts to call archive_file to fail."
-	esac 
-fi
+rr_home_remote=${rr_home_remote:-/tmp/rr}
 
 archive_file() {
-	if  [[ -z $nc_cmd ]]
-	then
-		fail "Unable to locate netcat."
-	fi
-
 	if [[ -z $archive_name ]]
 	then
 		fail "Unknown archive."
@@ -63,12 +40,13 @@ archive_file() {
 	eval "path=$1"
 	log_debug "Path has expanded to: [$path]"
 
-	echo "$archive_name::$src" | $nc_cmd $server_ip $fileserver_port > $path
-	if (( $? )) 
+	file=$rr_home_remote/$archive_name/files/$src
+	if [[ ! -f $file ]]
 	then
-		log_error "Error downloading file [$src] and creating file [$1]"
-		exit 1
-	fi
+		fail "Archive file [$src] does not exist in archive [$archive_name]"
+	fi 
+
+	cp $file $path || fail "Error creating file: $path"
 
 	if ! chown $owner:$group $path 
 	then

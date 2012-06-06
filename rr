@@ -115,48 +115,62 @@ _key_env() {
 		fail "That key file [$key_file] doesn't exist!"
 	fi
 
-	if ! ssh-add $key_file  &> /dev/null
-	then
-		fail "Unable to source the key file [$key_file]"
-	fi 
+	ssh-add $key_file
+	#if ! 
+	#then
+		##fail "Unable to source the key file [$key_file]"
+	#fi 
 }
 
+rr_tmp_local=${rr_tmp_local:-/tmp}
+rr_tmp_remote=${rr_tmp_remote:-/tmp}
+rr_home_remote=$rr_tmp_remote/rr
 
 # Given the target machine, this method will print the
 # runtime library to stdout.
 #
 # @param 1 - The target host.
 _runtime_lib() {
-	cat - <<-EOH
-	server_ip=$(inet_src_ip "$(login_get_host $1)")
-	EOH
+	tar -cf $rr_tmp_local/rr.tar -C $rr_home remote && \
+		tar -f $rr_tmp_local/rr.tar -C $rr_home --append lib && \
+		tar -f $rr_tmp_local/rr.tar -C $rr_home --append dsl && \
 
-	for key in "${!attributes[@]}"
-	do
-		echo "$key=${attributes[$key]}"
-	done
+		{
+			echo "source $rr_home_remote/remote/require.sh"
 
-	for key in "${!globals[@]}"
-	do
-		echo "$key=${globals[$key]}"
-	done
+			for script in $rr_home/remote/*.sh
+			do
+				echo "require \"remote/$(basename $script)\""
+			done
 
-	for script in $rr_home/remote/*.sh
-	do
-		cat $script
-	done
+			for script in $rr_home/lib/*.sh
+			do
+				echo "require \"lib/$(basename $script)\""
+			done
 
-	for script in $rr_home/lib/*.sh
-	do
-		cat $script
-	done
+			for script in $rr_home/dsl/*.sh
+			do
+				echo "require \"dsl/$(basename $script)\""
+			done
 
-	for script in $rr_home/dsl/*.sh
-	do
-		cat $script
-	done
+			for key in "${!attributes[@]}"
+			do
+				echo "$key=${attributes[$key]}"
+			done
+
+			for key in "${!globals[@]}"
+			do
+				echo "$key=${globals[$key]}"
+			done
+		} | cat > $rr_tmp_local/env.sh && \
+			tar -f $rr_tmp_local/rr.tar -C $rr_tmp_local --append env.sh && \
+			rm -fr $rr_tmp_local/env.sh
+
+		return $?
 }
 
+# 
+#
 # Copy over the runtime library to a particular
 # host.  This will copy an archive to the
 # remote host to: /tmp/archive.sh
@@ -179,21 +193,11 @@ _remote_lib_copy() {
 
 	log_info "Building archive library from archives: $(array_print ${archives[@]})"
 
-	{
-		_runtime_lib $host
-	} | tee /tmp/lib.sh | cat - > /tmp/rr.sh || fail "Failed to build runtime lib"
-
-	(
-		builtin cd /tmp	
-		tar -cf $host.tar rr.sh 
-		local ret=$?
-		rm -f rr.sh
-		exit $ret
-	) || fail "Unable to build library tar."
+	_runtime_lib $host || fail "Failed to build runtime lib"
 
 	for archive in "${archives[@]}"
 	do
-		log_debug "Building archive script [$archive]"
+		log_debug "Building archive library [$archive]"
 
 		local archive_name=$(_archive_get_name $archive)
 		local archive_script=$(_archive_get_script $archive)
@@ -204,44 +208,41 @@ _remote_lib_copy() {
 			fail "Unable to locate archive [$archive]"
 		fi
 
+		if ! tar -tf $rr_tmp_local/rr.tar | grep "$archive_name/files" &> /dev/null
+		then
+			log_debug "The archive [$archive_name] has not been added to the runtime lib"
+			tar -f $rr_tmp_local/rr.tar -C $rr_archive_home --append $archive_name/files
+		fi
+
 		{
-			echo -ne ". /tmp/rr.sh; $archive_name::$archive_script() { archive_name=$archive_name;"
+			echo -ne "source $rr_home_remote/env.sh; $archive_name::$archive_script() { archive_name=$archive_name;"
 			cat $script
 			echo "}; $archive_name::$archive_script;"
-		} | cat - > /tmp/$archive_name::$archive_script.sh || fail "Failed to build archive script [$archive]"
+		} | cat -> $rr_tmp_local/$archive_name::$archive_script.sh  
 
-		(
-			builtin cd /tmp	
-			tar -f $host.tar --append $archive_name::$archive_script.sh 
-			local ret=$?
-			rm -f $archive_name::$archive_script.sh
-			exit $ret
-		) || fail "Unable to build library tar."
+		tar -f $rr_tmp_local/rr.tar -C $rr_tmp_local --append $archive_name::$archive_script.sh && \
+			rm -f $rr_tmp_local/$archive_name::$archive_script.sh || \
+			fail "Error adding archive to runtime lib [$archive]"
 
-		cmd+="if [[ -z \$ret ]] || [[ \$ret -eq 0 ]]; then bash /tmp/$archive_name::$archive_script.sh; ret=\$?; fi; rm /tmp/$archive_name::$archive_script.sh; " 
+		cmd+="if [[ -z \$ret ]] || [[ \$ret -eq 0 ]]; then bash $rr_home_remote/$archive_name::$archive_script.sh; ret=\$?; fi; rm -fr $rr_home_remote/$archive_name; rm $rr_home_remote/$archive_name::$archive_script.sh; " 
 	done
 
-	cmd+="rm /tmp/rr.sh; exit \$ret"
+	cmd+="exit \$ret"
 
 	log_debug "Building execute script."
 
 	(
-		echo "$cmd" > /tmp/execute.sh
-		builtin cd /tmp
-		tar -f $host.tar --append execute.sh 
-		ret=$?
-		rm -f /tmp/execute.sh
-		exit $ret
-	) || fail "Unable to build execute script."
+		echo "$cmd" > $rr_tmp_local/execute.sh && \
+			tar -f $rr_tmp_local/rr.tar -C $rr_tmp_local --append execute.sh && \
+			rm -f $rr_tmp_local/execute.sh 
+	) || fail "Error building execute script."
 
 
 	log_debug "Copying library to remote host [$host]"
 
 	(
-		scp -i $key_file /tmp/$host.tar $host:/tmp/archive.tar
-		ret=$?
-		rm -f /tmp/$host.tar 
-		exit $ret
+		scp -i $key_file $rr_tmp_local/rr.tar $host:/$rr_tmp_remote/rr_remote.tar && \
+		rm -f $rr_tmp_local/rr.tar 
 	) || fail "Error transferring archives to host [$host]"
 }
 
@@ -260,23 +261,18 @@ _remote_lib_execute() {
 
 	log_info "Executing archives on host [$host] : $( array_print ${archives[@]} )"
 
-	local cmd="tar -xf /tmp/archive.tar -C /tmp && "
+	local cmd="mkdir -p $rr_home_remote; tar -xf $rr_tmp_remote/rr_remote.tar -C $rr_home_remote && "
 	if [[ -n $rr_sudo ]] && $rr_sudo 
 	then
 		cmd+="sudo "
 	fi
 
-	cmd+="bash /tmp/execute.sh; "
-	cmd+="ret=\$?; rm /tmp/archive.tar /tmp/execute.sh; exit \$ret"
+	cmd+="bash $rr_home_remote/execute.sh; "
+	cmd+="ret=\$?; rm $rr_tmp_remote/rr_remote.tar; rm -fr $rr_home_remote; exit \$ret"
 	
-	fileserver_start $rr_archive_home \
-		|| fail "Error starting fileserver"
-
 	ssh -t -i $key_file $host "$cmd"
 
 	ret=$?
-
-	fileserver_stop
 
 	if [ $ret -ne 0 ]
 	then

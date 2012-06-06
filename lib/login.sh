@@ -5,7 +5,7 @@
 # @param login The login string.
 #
 login() {
-	if [[ "$(expr "$1" : "^[^ ]\+@[^ ]\+$")" != "0" ]]
+	if echo $1 | grep '@' &> /dev/null
 	then 
 		echo "$1"
 		exit 0
@@ -20,7 +20,7 @@ login() {
 # @param login The normalized login string. 
 #
 login_get_host() {
-	expr "$1" : "^[^ ]\+@\([^ ]\+\)$"
+	expr "$1" : ".*@\(.*\)$"
 }
 
 
@@ -30,5 +30,5 @@ login_get_host() {
 # @param login The normalized login string. 
 #
 login_get_user() {
-	expr "$1" : "^\([^ ]\+\)@"
+	expr "$1" : "\(.*\)@"
 }

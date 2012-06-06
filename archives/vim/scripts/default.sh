@@ -1,7 +1,6 @@
 package_install "vim-nox"
 package_install "exuberant-ctags"
 
-vim_users=( pkopriv2 )
 for user in "${vim_users[@]}"
 do
 	home=$(user_get_home "$user")
