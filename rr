@@ -19,7 +19,6 @@ require "host.sh"
 require "key.sh"
 require "role.sh"
 require "archive.sh"
-require "fileserver.sh"
 
 IFS=$'\n'
 unalias "rm" &> /dev/null
