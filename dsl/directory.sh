@@ -18,7 +18,7 @@ directory() {
 		group=$1
 	}
 
-	local permissions="644"
+	local permissions="755"
 	permissions() {
 		permissions=$1
 	}

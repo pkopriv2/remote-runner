@@ -69,12 +69,6 @@ archive_create() {
 		esac 
 	done
 
-	#if [[ -d $1 ]] || [[ -e $rr_archive_home/$1 ]]
-	#then
-		#error "That archive [$1] already exists."
-		#exit 1
-	#fi
-
 	info "Creating archive [$1]"
 
 	if ! mkdir $output_dir/$1 &> /dev/null \

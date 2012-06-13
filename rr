@@ -211,6 +211,7 @@ _remote_lib_copy() {
 		then
 			log_debug "The archive [$archive_name] has not been added to the runtime lib"
 			tar -f $rr_tmp_local/rr.tar -C $rr_archive_home --append $archive_name/files
+			tar -f $rr_tmp_local/rr.tar -C $rr_archive_home --append $archive_name/templates
 		fi
 
 		{
@@ -223,7 +224,7 @@ _remote_lib_copy() {
 			rm -f $rr_tmp_local/$archive_name::$archive_script.sh || \
 			fail "Error adding archive to runtime lib [$archive]"
 
-		cmd+="if [[ -z \$ret ]] || [[ \$ret -eq 0 ]]; then bash $rr_home_remote/$archive_name::$archive_script.sh; ret=\$?; fi; rm -fr $rr_home_remote/$archive_name; rm $rr_home_remote/$archive_name::$archive_script.sh; " 
+		cmd+="if [[ -z \$ret ]] || [[ \$ret -eq 0 ]]; then bash $rr_home_remote/$archive_name::$archive_script.sh; ret=\$?; fi;  " 
 	done
 
 	cmd+="exit \$ret"

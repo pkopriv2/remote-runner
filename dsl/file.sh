@@ -5,7 +5,10 @@ file() {
 
 	local contents=""
 	contents() {
-		contents=$(cat -)
+		if ! test -t 0
+		then
+			contents=$(cat -)
+		fi
 	}
 
 	local owner="$USER"
@@ -18,9 +21,14 @@ file() {
 		group=$1
 	}
 
-	local permissions="644"
+	local permissions="755"
 	permissions() {
 		permissions=$1
+	}
+
+	local overwrite=false
+	overwrite() {
+		overwrite=$1
 	}
 
 	if ! test -t 0
@@ -47,5 +55,11 @@ file() {
 		exit 1
 	fi
 
-	echo "$contents" | cat > $path
+	if overwrite 
+	then
+		echo "$contents" | cat > $path
+	else
+		echo "$contents" | cat >> $path
+	fi
+
 }

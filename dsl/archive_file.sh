@@ -30,7 +30,7 @@ archive_file() {
 		group=$1
 	}
 
-	local permissions="644"
+	local permissions="755"
 	permissions() {
 		permissions=$1
 	}
@@ -40,7 +40,9 @@ archive_file() {
 	eval "path=$1"
 	log_debug "Path has expanded to: [$path]"
 
-	file=$rr_home_remote/$archive_name/files/$src
+	local file=$rr_home_remote/$archive_name/files/$src
+	log_debug "Retrieving file from: $file"
+
 	if [[ ! -f $file ]]
 	then
 		fail "Archive file [$src] does not exist in archive [$archive_name]"
