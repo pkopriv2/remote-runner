@@ -60,18 +60,27 @@ archive_create() {
 		exit 1
 	fi
 
-	if [[ -d $1 ]] || [[ -e $rr_archive_home/$1 ]]
-	then
-		error "That archive [$1] already exists."
-		exit 1
-	fi
+	local output_dir=$(pwd)
+	while getopts ":o" opt 
+	do
+		case $opt in
+			o)
+				output_dir=$OPTARG
+		esac 
+	done
+
+	#if [[ -d $1 ]] || [[ -e $rr_archive_home/$1 ]]
+	#then
+		#error "That archive [$1] already exists."
+		#exit 1
+	#fi
 
 	info "Creating archive [$1]"
 
-	if ! mkdir $1 &> /dev/null \
-	|| ! mkdir $1/files &> /dev/null \
-	|| ! mkdir $1/scripts &> /dev/null \
-	|| ! touch $1/scripts/default.sh &> /dev/null
+	if ! mkdir $output_dir/$1 &> /dev/null \
+	|| ! mkdir $output_dir/$1/files &> /dev/null \
+	|| ! mkdir $output_dir/$1/scripts &> /dev/null \
+	|| ! touch $output_dir/$1/scripts/default.sh &> /dev/null
 	then 
 		error "Error creating archive [$1]."
 		exit 1

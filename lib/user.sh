@@ -20,3 +20,7 @@ all_users() {
 user_get_home() {
 	eval "echo ~$1"
 }
+
+user_get_primary_group() {
+	id -g -n $1
+}

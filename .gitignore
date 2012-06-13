@@ -1,4 +1,5 @@
 *.swp*
+*.swo*
 hosts/
 keys/
 roles/
