@@ -7,8 +7,6 @@ then
 fi
 
 
-echo "Determined installation directory: $install_dir"
-
 cat - > ~/.profile.d/rr.sh <<-EOF
 #! /bin/bash
 
@@ -17,5 +15,5 @@ export rr_home=$install_dir
 source $install_dir/env.sh
 source $install_dir/completions.sh
 
-PATH=\$PATH:$install_dir
+PATH=\$PATH:$install_dir/bin
 EOF

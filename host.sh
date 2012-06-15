@@ -159,7 +159,8 @@ host_show() {
 	local ip=$(host_get_ip "$host")
 
 	info "$login: $ip"
-	cat $rr_host_home/$login.sh | grep '^[^#]' | sed 's|^\(.\)|   \1|'
+
+	cat $rr_host_home/$login.sh 
 }
 
 host_edit() {
