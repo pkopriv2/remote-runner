@@ -1,6 +1,7 @@
 #! /bin/bash -e
 
 set -o errexit
+set -o errtrace
 
 source ${rr_home:-$HOME/.rr}/local/require.sh
 
@@ -20,9 +21,10 @@ then
 	exit 1
 fi 
 
-if [[ ! -f $1 ]] 
+file=$1
+if [[ ! -f $file ]] 
 then
-	error "Bashee file [$1] doesn't exist."
+	error "Bashee file [$file] doesn't exist."
 	exit 1 
 fi 
 
@@ -39,7 +41,6 @@ then
 	error "Unable to create tmp file."
 	exit 1
 fi 
-
 
 delim=${bashee_delim:-"--"}
 
@@ -77,32 +78,35 @@ delim=${bashee_delim:-"--"}
 			echo $line | sed 's|\$|\\$|g'
 		fi
 			
-	done < $1
+	done < $file
 
 	$cmd || echo "EOF" 
 
 } | cat - > $tmp_file
 
-# setup the error scenarios.
+
 on_exit() {
-	rm -fr /tmp/err.out
-	rm -fr /tmp/bashee.tmp
-	exit $1
+	rm -f /tmp/bashee.tmp
+	rm -f /tmp/bashee.out
 }
 
 on_error() {
-	error "Error procesing template: $( cat /tmp/err.out )"
-	on_exit 1
+	local line_num=$1
+
+	(( line_num-- )) 
+
+	error "Error procesing template: $file: $line_num"
+	exit 1
 }
 
-trap 'on_error' ERR
-trap 'on_exit 0' EXIT INT
+trap 'on_exit' EXIT INT
+trap 'on_error $LINENO' ERR
 
-# source std in, it will be executed in this context
 if ! test -t 0
 then
 	source /dev/stdin
 fi
 
-source $tmp_file 2> /dev/null && \
-	exit 0 
+source $tmp_file > /tmp/bashee.out
+
+cat /tmp/bashee.out

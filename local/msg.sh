@@ -10,8 +10,8 @@ info() {
 error() {
 	if ! tput setaf &> /dev/null
 	then
-		echo -e "$1 >&2"
+		echo -e "$1" 1>&2
 	else
-		echo -e "$(tput setaf 1)$1$(tput sgr0)"
+		echo -e "$(tput setaf 1)$1$(tput sgr0)" 1>&2
 	fi
 }
