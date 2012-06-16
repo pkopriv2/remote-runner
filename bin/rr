@@ -21,7 +21,6 @@ require "role.sh"
 require "archive.sh"
 
 IFS=$'\n'
-unalias "rm" &> /dev/null
 
 # Determines the host environment.  This will set the following
 # global variables:

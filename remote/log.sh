@@ -1,4 +1,4 @@
-log_level=${log_level:-INFO}
+log_level=${log_level:-DEBUG}
 
 debug_levels=( DEBUG )
 log_debug() {

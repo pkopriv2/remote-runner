@@ -1,0 +1,11 @@
+#! /bin/bash
+
+set -o errexit
+set -o errtrace
+
+source ${rr_home:-$HOME/.rr}/local/require.sh
+
+# Usage:
+#
+#
+# griswold -b <base> -o <archive> file1 .. filen 

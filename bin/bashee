@@ -1,4 +1,4 @@
-#! /bin/bash -e
+#! /bin/bash
 
 set -o errexit
 set -o errtrace
@@ -6,14 +6,6 @@ set -o errtrace
 source ${rr_home:-$HOME/.rr}/local/require.sh
 
 require "local/msg.sh"
-
-
-# Processes an embedded bash file.  The command is executed
-#
-#
-# Usage:
-# 
-# bashee /path/to/file
 
 if [[ -z $1 ]] 
 then
@@ -90,9 +82,20 @@ on_exit() {
 	rm -f /tmp/bashee.out
 }
 
-on_error() {
+on_source_error() {
 	local line_num=$1
 
+	error "Error sourcing stdin: $line_num"
+	exit 1
+}
+
+on_template_error() {
+	local line_num=$1
+
+
+	# The line number of the /tmp/bashee.out file will be
+	# offset by one from the real template since we 
+	# added an extra line at the beginning.
 	(( line_num-- )) 
 
 	error "Error procesing template: $file: $line_num"
@@ -100,12 +103,14 @@ on_error() {
 }
 
 trap 'on_exit' EXIT INT
-trap 'on_error $LINENO' ERR
+trap 'on_source_error $LINENO' ERR
 
 if ! test -t 0
 then
 	source /dev/stdin
 fi
+
+trap 'on_template_error LINENO' ERR
 
 source $tmp_file > /tmp/bashee.out
 
