@@ -1,5 +1,7 @@
 #! /bin/bash
 
+set -a 
+
 declare -A attributes
 
 # Determines the host environment.  This will set the following
@@ -47,9 +49,7 @@ _source_host() {
 # 
 # @param 1..n - The roles to source.
 #
-
-
-_source_role() {
+_source_roles() {
 	attributes=()
 	attr() {
 		attributes+=(["$1"]=$2)
@@ -99,6 +99,20 @@ _source_key() {
 	then
 		fail "Unable to source the key file [$key_file]"
 	fi 
+}
+
+_create_std_lib() {
+
+}
+
+_create_lib() {
+	local host=$1
+	local key_file=$2
+	local archives=( ${@:3} )
+
+	log_info "Building archive library from archives: $(array_print ${archives[@]})"
+
+
 }
 
 

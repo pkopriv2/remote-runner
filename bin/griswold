@@ -3,9 +3,136 @@
 set -o errexit
 set -o errtrace
 
-source ${rr_home:-$HOME/.rr}/local/require.sh
+source ${rr_home:-$HOME/.rr}/local/msg.sh
 
 # Usage:
 #
 #
-# griswold -b <base> -o <archive> file1 .. filen 
+# griswold -b <base> -o <output_file> [tar options] file1 .. filen 
+
+
+# This is essentially a wrapper for tar. we'll need to store
+# off 
+tar_args=()
+
+# All the normal positional params are input files.
+files=()
+while [[ $# -gt 0 ]]
+do
+	arg="$1"
+
+	case "$arg" in
+		-b|--base)
+			shift
+			base_dir="$1"
+    		;;
+		-o|--output)
+			shift
+			out="$1"
+    		;;
+		-C|-c|--context)
+			shift
+			context="$1"
+			;;
+		-f|--file|-r|--append)
+			error "That arg [$arg] is not allowed"
+			exit 1
+    		;;
+		-*)
+			shift
+			tar_args+=("$1")
+    		;;
+		*)
+			files+=("$1")
+    		;;
+	esac
+
+	shift
+done
+
+if [[ ${#files[@]} -eq 0 ]]
+then
+	error "Must provide at least one input file."
+	exit 1
+fi
+
+if [[ -z $out ]]
+then
+	error "Must provide an output file."
+	exit 1
+fi
+
+if [[ ! -z $context ]]
+then
+	if [[ ! -d $context ]]
+	then
+		error "That context directory [$context] doesn't exist."
+		exit 1
+		
+	fi 
+
+	builtin cd $context
+fi
+
+tmp_dir=${tmp_dir:-"/tmp"}
+if [[ ! -d $tmp_dir ]] 
+then
+	error "Tmp directory [$tmp_dir] doesn't exist."
+	exit 1
+fi
+
+if [[ ! -z $base_dir ]]
+then
+	link_dir=$tmp_dir/griswold/$(dirname $base_dir)
+	mkdir -p $link_dir || (
+		error "Error creating base directory: $link_dir"
+		exit 1
+	)
+
+	link_dir=$link_dir/$(basename $base_dir)
+else
+	link_dir=$tmp_dir/griswold
+fi
+
+ln -s $(pwd) $link_dir || (
+	error "Error applying base_dir [${base_dir:-"."}]"
+	exit 1
+)
+
+on_exit() {
+	rm -f $link_dir	
+	rm -fr $tmp_dir/griswold
+}
+
+on_error() {
+	rm -f $out 
+}
+
+trap "on_exit" INT EXIT
+
+touch $out &> /dev/null || ( 
+	error "Unable to write to that file [$out]"
+	exit 1
+)
+
+builtin cd $tmp_dir/griswold
+
+for file in "${files[@]}"
+do
+	if [[ ! -z $base_dir ]]
+	then
+		file=$base_dir/$file
+	fi
+
+	echo $(pwd)
+	echo $file
+
+	if [[ ! -f $file ]]
+	then
+		error "That file doesn't exist"
+		on_error
+		exit 1
+	fi
+
+	echo "tar \"${tar_args[*]}\" --file $out --append $file"
+done
