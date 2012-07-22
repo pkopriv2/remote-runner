@@ -269,14 +269,13 @@ run_help() {
 run_action() {
 	args=($*)
 	action="${args[0]}"
-	unset args[0]
 
 	case "$action" in
 		help)
 			run_help 
 			;;
 		*)
-			run $action "${args[@]}"
+			run "${args[@]}"
 			;;
 	esac
 }

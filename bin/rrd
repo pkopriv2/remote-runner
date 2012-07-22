@@ -1,38 +1,87 @@
 #! /bin/bash
 
-# by default this will run every 30mins
-period=1800
+source $rr_home/require.sh
 
-# by default the log file will be in current dir
-log_file=rr.out
+require "lib/msg.sh" 
 
-args=()
-while [[ $# -gt 0 ]]
-do
-	arg="$1"
+rrd_list() {
+	info "Active instances:"
 
-	case "$arg" in
-		-p|--period)
-			shift
-			period="$1"
-			;;
-		--log-file) 
-			shift 
-			log_file="$1"
-			;;
-		*)
-			args+=( "$1" )
-			;;
-	esac
-	shift
-done
+	ps -A -o pid -o etime -o args \
+		| grep '\(PID\|rrd\)' | grep -v 'grep' | grep -v "$$"
+}
 
-(
+rrd_killall() {
+	ps -A -o pid -o args \
+		| grep 'rrd' | grep -v 'grep' | grep -v "$$" \
+		| awk '{print $1;}' | xargs kill
+}
 
-while true
-do
-	rr run "${args}" 
-	sleep $period
-done
+rrd_start() {
+	info "Starting rrd: $*"
 
-) >> $log_file &
+	args=()
+	while [[ $# -gt 0 ]]
+	do
+		arg="$1"
+
+		case "$arg" in
+			--period)
+				shift
+				period="$1"
+				;;
+			--log-file) 
+				shift 
+				log_file="$1"
+				;;
+			*)
+				args+=( "$1" )
+				;;
+		esac
+		shift
+	done
+
+	(
+		while true
+		do
+			rr run "${args[@]}" 
+			sleep ${period:-30}
+		done
+	) &>> ${log_file:-rr.out} &
+}
+
+rrd_help() {
+	info "** Usage **" 
+	echo "rrd [options] [rr run options]"
+
+	printf "%s\n" "
+OPTIONS:
+  --period     The time to wait between invocations.
+  --log-file   The output log file.
+"
+
+	info "** Sub Commands **"
+
+	local methods=( list killall )
+	for method in "${methods[@]}" 
+	do
+		echo "rrd $method"
+	done
+
+}
+
+args=($*)
+action="${args[0]}"
+shift
+
+case "$action" in
+	list|killall)
+		rrd_$action "${@}"
+		;;
+	help)
+		rrd_help
+		;;	
+	*)
+		rrd_start "${args[@]}"
+		;;	
+esac
