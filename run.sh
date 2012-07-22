@@ -1,138 +1,270 @@
 #! /bin/bash
 
-set -a 
+set -o errtrace
+set +o noglob 
 
 declare -A attributes
 
-# Determines the host environment.  This will set the following
-# global variables:
-# 	- key
-#   - roles
-# 
-# @param 1 - The host environment to source
-#
-_source_host() {
-	log_info "Sourcing host environment: $1"
+rr_tmp_local=${rr_tmp_local:-/tmp}
+rr_tmp_remote=${rr_tmp_remote:-/tmp}
 
-	key="default"
-	key() {
-		key=${1:-"default"}
-	}
 
-	roles=()
-	roles() {
-		roles+=( $* )
-	}
+require "local/log.sh"
+require "lib/msg.sh"
+require "lib/array.sh"
 
-	if [[ ! -f $rr_host_home/$1.sh ]] 
-	then
-		fail "Host file [$1] does not exist."
-	fi 
+require "host.sh"
+require "key.sh"
+require "role.sh"
+require "archive.sh"
 
-	if ! source $rr_host_home/$1.sh
-	then
-		fail "Error sourcing host file [$host]"
-	fi
-
-	roles=( $(array_uniq "${roles[@]}") )
-
-	unset -f key
-	unset -f roles
+on_exit() {
+	rm -f $rr_tmp_local/rr.tar
+	rm -f $rr_tmp_local/run.sh
 }
 
-# Given a list of roles, this method will source
-# all the role files and upadate the following global
-# attributes:
+trap 'on_exit' EXIT INT
+
+
+# Given a list of archives, this function generates the library to be run 
+# on the remote host. The library will take the form:
+#  	* rr/
+#   * rr/lib/*
+#   * rr/dsl/*
+#   * rr/remote/*
+#   * rr/archives/*
 #
-#   - attributes
-# 	- archives
-# 
-# @param 1..n - The roles to source.
-#
-_source_roles() {
-	attributes=()
-	attr() {
-		attributes+=(["$1"]=$2)
-	}
-
-	archives=()
-	archives() {
-		archives+=( $* )
-	}
-
-	for role in "${@}"
-	do
-		if [[ ! -f $rr_role_home/$role.sh ]] 
-		then
-			fail "Unable to determine run list for host [$1].  Role [$role] does not exist."
-		fi 
-
-		if ! source $rr_role_home/$role.sh
-		then 
-			fail "Error sourcing role file [$role]: $err"
-		fi
-	done
-
-	archives=( $(array_uniq "${archives[@]}") )
-
-	unset -f attr
-	unset -f archives 
-}
-
-# Given a key name determine the keyfile and
-# add it to the ssh connection agent. This
-# will set the following global attributes:
-#
-# 	- key_file
-#
-# @param 1 - The name of the key
-#
-_source_key() {
-	key_file=$rr_key_home/id_rsa.$key
-
-	if [[ ! -f $key_file ]] 
-	then 
-		fail "That key file [$key_file] doesn't exist!"
-	fi
-	
-	if ! ssh-add $key_file
-	then
-		fail "Unable to source the key file [$key_file]"
-	fi 
-}
-
-_create_std_lib() {
-
-}
-
-_create_lib() {
-	local host=$1
-	local key_file=$2
-	local archives=( ${@:3} )
+_lib_create() {
+	local archives=( ${@} )
 
 	log_info "Building archive library from archives: $(array_print ${archives[@]})"
 
+	# add the standard library files.
+	griswold -o $rr_tmp_local/rr.tar  \
+			 -C $rr_home 			  \
+		     -b rr  				  \
+			 require.sh 		      \
+			 lib 					  \
+			 dsl 					  \
+			 remote 					  
 
+	# start building the "run" script
+	{
+		echo "set -o errtrace"
+		echo "set -o allexport"
+		echo 
+
+		cat -<<-EOH
+			on_error() {
+				echo "An error occurred." 1>&2
+				caller 0					
+				exit 1
+			}
+
+			trap 'on_error' ERR
+
+			on_exit() {
+				rm -fr $rr_tmp_remote/rr
+				rm -f  $rr_tmp_remote/rr_tmp.tar
+			}
+
+			trap 'on_exit' EXIT INT
+		EOH
+
+		echo 
+		echo "rr_home=$rr_tmp_remote/rr"
+		echo 
+
+		echo "source \$rr_home/require.sh"
+		echo 
+
+		for script in $rr_home/lib/*.sh
+		do
+			echo "require \"lib/$(basename $script)\""
+		done
+
+		for script in $rr_home/dsl/*.sh
+		do
+			echo "require \"dsl/$(basename $script)\""
+		done
+
+		for script in $rr_home/remote/*.sh
+		do
+			echo "require \"remote/$(basename $script)\""
+		done
+
+		echo
+
+		for key in "${!attributes[@]}"
+		do
+			echo "$key=${attributes[$key]}"
+		done
+
+		echo "log_level=$log_level"
+
+		echo
+	} | cat - > $rr_tmp_local/run.sh
+
+	# add each archive to the library (and add their invocations to the run script)
+	for archive in "${archives[@]}"
+	do
+		log_debug "Building archive library [$archive]"
+
+		local archive_name=$(_archive_get_name $archive)
+		if [[ ! -d $rr_archive_home/$archive_name ]]
+		then
+			fail "Unable to locate archive [$archive_name]"
+		fi
+
+		local archive_script=$(_archive_get_script $archive)
+		if [ ! -f $rr_archive_home/$archive_name/scripts/$archive_script.sh ]
+		then
+			fail "Unable to locate archive [$archive]"
+		fi
+
+		if ! tar -tf $rr_tmp_local/rr.tar | grep -q "$archive_name"
+		then
+			log_debug "The archive [$archive_name] has not been added."
+
+			griswold -o $rr_tmp_local/rr.tar  \
+					 -c $rr_archive_home 	  \
+					 -b rr/archives 		  \
+					 $archive_name 					
+		fi
+
+		{
+			echo "source \$rr_home/archives/$archive_name/scripts/$archive_script.sh"
+		} | cat ->> $rr_tmp_local/run.sh
+	done
+
+	griswold -o $rr_tmp_local/rr.tar  \
+			 -c $rr_tmp_local 	      \
+			 -b rr 					  \
+			 run.sh
+
+	rm -f $rr_tmp_local/run.sh
+}
+
+_lib_run() {
+	local host=$1
+	local key_file=$2
+
+	log_info "Executing runlist on host [$host]"
+
+	scp -i $key_file $rr_tmp_local/rr.tar $host:$rr_tmp_remote/rr_tmp.tar &> /dev/null ||
+		fail "Error transferring library to host [$host]"
+
+	local cmd=$( 
+		cat - <<-CMD
+			tar -xf $rr_tmp_remote/rr_tmp.tar -C $rr_tmp_remote
+			if $sudo 
+			then
+				sudo bash $rr_tmp_remote/rr/run.sh
+			else
+				bash $rr_tmp_remote/rr/run.sh
+			fi
+		CMD
+	)
+
+	ssh -t -i $key_file $1 "$cmd"
+}
+
+run() {
+	host_regexps=()
+
+	tmp_roles=()
+	
+	sudo=false
+	while [[ $# -gt 0 ]]
+	do
+		arg="$1"
+
+		case "$arg" in
+			-l|--log_level)
+				shift
+				log_level="$1"
+				;;
+			-r|--role)
+				shift
+				tmp_roles+=( "$1" )
+				;;
+			-s|--sudo)
+				sudo=true
+				;;
+			*)
+				host_regexps+=( "$1" )
+				;;
+		esac
+		shift
+	done
+
+	log_debug "Collecting hosts that match: $(array_print "${host_regexps[@]}")"
+
+	local hosts=()
+	for host_regexp in "${host_regexps[@]}"
+	do
+		hosts+=( $( _host_match $host_regexp) )
+	done
+
+	hosts=( $(array_uniq ${hosts[@]}) )
+
+	log_info "Hosts have expanded to: $(array_print "${hosts[@]}")"
+
+	for host in "${hosts[@]}"
+	do
+		(
+		# Source the host file.  This will set the following
+		# global variables:
+		# 	- key
+		#   - roles
+		#
+		_source_host $host
+
+		# if roles were provided as arguments then use those.
+		if [[ ${#tmp_roles[@]} -gt 0 ]]
+		then
+			roles=$tmp_roles
+		fi
+
+		# Source the roles.  This will set the following
+		# global variables:
+		#   - attributes
+		#   - archives
+		#
+		_source_roles ${roles[@]}
+
+		# Determine the necessary ssh key to use to 
+		# run on this host.  Add the identity file
+		# to limit the number of times that the passphrase
+		# is requested. This will set the following 
+		# global variables:
+		# 	- key_file
+		#
+		_source_key $key
+
+		log_info "Runlist has expanded to: $(array_print ${archives[@]}) "
+
+		# Check to see if any archives have been applied to
+		# this host.  If not, then we don't need to continue
+		if [[ ${#archives} == 0 ]] 
+		then
+			log_info "No archives to execute."
+			exit 0
+		fi
+
+		_lib_create "${archives[@]}"
+		_lib_run $host $key_file
+
+		) || fail "Error executing host [$host] runlist."
+	done
 }
 
 
 run_help() {
-	info "** Host Commands **"
+	info "Usage: rr run [options] regexp [regexp]*"
 	echo 
 
-	methods=( list )
-	for method in "${methods[@]}" 
-	do
-		echo "rr host $method [options]"
-	done
-
-	methods=( bootstrap show edit )
-	for method in "${methods[@]}" 
-	do
-		echo "rr host $method [options] [HOST]"
-	done
 }
-
 
 run_action() {
 	args=($*)
@@ -140,12 +272,11 @@ run_action() {
 	unset args[0]
 
 	case "$action" in
-		list|bootstrap|show|edit)
-			host_$action "${args[@]}"
+		help)
+			run_help 
 			;;
 		*)
-			host_help
-			exit 1
+			run $action "${args[@]}"
 			;;
 	esac
 }

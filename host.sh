@@ -3,11 +3,44 @@
 require "lib/login.sh"
 require "lib/user.sh"
 require "lib/host.sh"
-require "local/msg.sh"
+require "lib/msg.sh"
 require "key.sh"
 
 rr_host_home=${rr_host_home:-$rr_home/hosts}
 dir_create_if_missing "$rr_host_home"
+
+# Determines the host environment.  This will set the following
+# global variables:
+# 	- key
+#   - roles
+# 
+# @param 1 - The host environment to source
+#
+_source_host() {
+	log_info "Sourcing host environment: $1"
+
+	key="default"
+	key() {
+		key=${1:-"default"}
+	}
+
+	roles=()
+	roles() {
+		roles+=( $* )
+	}
+
+	if [[ ! -f $rr_host_home/$1.sh ]] 
+	then
+		fail "Host file [$1] does not exist."
+	fi 
+
+	source $rr_host_home/$1.sh
+
+	roles=( $(array_uniq "${roles[@]}") )
+
+	unset -f key
+	unset -f roles
+}
 
 # Lists all the hosts that have been bootstrapped.
 #
@@ -82,14 +115,14 @@ _ssh_bootstrap() {
 	if [[ -z $user ]]
 	then
 		error "Unable to determine user from login [$1]"
-		exit 1
+		return 1
 	fi
 
 	local pub_key=$(key_show "$2" 2> /dev/null)
 	if [[ -z $pub_key ]]
 	then 
 		error "Unable to determine value of public key [$2]"
-		exit 1
+		return 1
 	fi
 
 	ssh $1 "bash -s" 2>&1 > /dev/null <<EOH

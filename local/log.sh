@@ -1,8 +1,6 @@
-#! /bin/bash
-
 require "lib/array.sh"
 
-log_level=${log_level:-DEBUG}
+log_level=${log_level:-INFO}
 
 
 debug_levels=( DEBUG )
@@ -12,7 +10,7 @@ log_debug() {
 		return 0
 	fi
 
-	echo -e "[LOCAL:$(caller 0)] [DEBUG]: $1"
+	echo -e "$(tput setaf 2)[LOCAL] [DEBUG]$(tput sgr0): $1"
 }
 
 # Logs a message out in a friendly green color if 
@@ -27,9 +25,9 @@ log_info() {
 
 	if ! tput setaf &> /dev/null
 	then
-		echo -e "[LOCAL:$(caller 0)] [INFO]: $1"
+		echo -e "[LOCAL] [INFO]: $1"
 	else
-		echo -e "$(tput setaf 2)[LOCAL:$(caller 0)] [INFO]$(tput sgr0): $1"
+		echo -e "$(tput setaf 2)[LOCAL] [INFO]$(tput sgr0): $1"
 	fi
 }
 
@@ -46,8 +44,8 @@ log_error() {
 
 	if ! tput setaf &> /dev/null
 	then
-		echo [LOCAL:$(caller 0)]: $1 >&2
+		echo [LOCAL]: $1 >&2
 	else
-		echo -e "$(tput setaf 1)[LOCAL:$(caller 0)]$(tput sgr0): $1" >&2
+		echo -e "$(tput setaf 1)[LOCAL]$(tput sgr0): $1" >&2
 	fi
 }

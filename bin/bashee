@@ -3,9 +3,9 @@
 set -o errexit
 set -o errtrace
 
-source ${rr_home:-$HOME/.rr}/local/require.sh
+source ${rr_home:-$HOME/.rr}/require.sh
 
-require "local/msg.sh"
+require "lib/msg.sh"
 
 if [[ -z $1 ]] 
 then
@@ -110,7 +110,7 @@ then
 	source /dev/stdin
 fi
 
-trap 'on_template_error LINENO' ERR
+trap 'on_template_error $LINENO' ERR
 
 source $tmp_file > /tmp/bashee.out
 

@@ -1,0 +1,38 @@
+#! /bin/bash
+
+# by default this will run every 30mins
+period=1800
+
+# by default the log file will be in current dir
+log_file=rr.out
+
+args=()
+while [[ $# -gt 0 ]]
+do
+	arg="$1"
+
+	case "$arg" in
+		-p|--period)
+			shift
+			period="$1"
+			;;
+		--log-file) 
+			shift 
+			log_file="$1"
+			;;
+		*)
+			args+=( "$1" )
+			;;
+	esac
+	shift
+done
+
+(
+
+while true
+do
+	rr run "${args}" 
+	sleep $period
+done
+
+) >> $log_file &

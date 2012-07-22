@@ -1,4 +1,7 @@
-log_level=${log_level:-DEBUG}
+require "lib/array.sh"
+
+log_level=${log_level:-INFO}
+
 
 debug_levels=( DEBUG )
 log_debug() {
@@ -7,7 +10,7 @@ log_debug() {
 		return 0
 	fi
 
-	echo -e "[REMOTE:$(caller 0)] [DEBUG]: $*" 
+	echo -e "$(tput setaf 5)[REMOTE] [DEBUG]$(tput sgr0): $1"
 }
 
 # Logs a message out in a friendly green color if 
@@ -20,7 +23,12 @@ log_info() {
 		return 0
 	fi
 
-	echo -e "[REMOTE:$(caller 0)] [INFO]: $1"
+	if ! tput setaf &> /dev/null
+	then
+		echo -e "[REMOTE] [INFO]: $1"
+	else
+		echo -e "$(tput setaf 5)[REMOTE] [INFO]$(tput sgr0): $1"
+	fi
 }
 
 # Logs a message out in a unfriendly red color. 
@@ -34,5 +42,10 @@ log_error() {
 		return 0
 	fi
 
-	echo -e "[REMOTE:$(caller 0)] [ERROR]: $*" 1>&2
+	if ! tput setaf &> /dev/null
+	then
+		echo [REMOTE]: $1 >&2
+	else
+		echo -e "$(tput setaf 1)[REMOTE]$(tput sgr0): $1" >&2
+	fi
 }

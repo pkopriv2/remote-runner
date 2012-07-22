@@ -2,7 +2,7 @@
 
 export rr_archive_home
 
-require "local/msg.sh"
+require "lib/msg.sh"
 require "lib/dir.sh"
 require "lib/fail.sh" 
 

@@ -3,8 +3,6 @@
 require "lib/fail.sh"
 
 rr_home_remote=${rr_home_remote:-/tmp/rr}
-rr_esh_delimiter=${rr_esh_delimiter:-"--"}
-
 
 template() {
 	if [[ -z $archive_name ]]

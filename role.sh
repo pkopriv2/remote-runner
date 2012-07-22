@@ -1,10 +1,46 @@
 #! /bin/bash
 
-require "local/msg.sh"
+require "lib/msg.sh"
 require "lib/dir.sh"
 
 rr_role_home=${rr_role_home:-$rr_home/roles}
 dir_create_if_missing "$rr_role_home"
+
+# Given a list of roles, this method will source
+# all the role files and upadate the following global
+# attributes:
+#
+#   - attributes
+# 	- archives
+# 
+# @param 1..n - The roles to source.
+#
+_source_roles() {
+	attributes=()
+	attr() {
+		attributes+=(["$1"]=$2)
+	}
+
+	archives=()
+	archives() {
+		archives+=( $* )
+	}
+
+	for role in "${@}"
+	do
+		if [[ ! -f $rr_role_home/$role.sh ]] 
+		then
+			fail "Unable to determine run list for host [$1].  Role [$role] does not exist."
+		fi 
+
+		source $rr_role_home/$role.sh
+	done
+
+	archives=( $(array_uniq "${archives[@]}") )
+
+	unset -f attr
+	unset -f archives 
+}
 
 # Generate a role file
 # 

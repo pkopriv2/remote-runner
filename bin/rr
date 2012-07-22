@@ -1,374 +1,30 @@
-#! /bin/bash
+#! /bin/bash -f
 
 export rr_home=${rr_home:-$HOME/.rr}
 export rr_host_home=${rr_host_home:-$rr_home/hosts}
 export rr_archive_home=${rr_archive_home:-$rr_home/archives}
 export rr_role_home=${rr_role_home:-$rr_home/roles}
 
-source $rr_home/local/require.sh
+source $rr_home/require.sh
 
 declare -A globals
 declare -A attributes
 
-require "lib/login.sh"
-require "lib/inet.sh"
-require "lib/array.sh"
-require "local/log.sh"
-require "local/msg.sh"
+require "lib/msg.sh"
+
 require "host.sh"
 require "key.sh"
 require "role.sh"
 require "archive.sh"
+require "run.sh"
 
 IFS=$'\n'
-
-# Determines the host environment.  This will set the following
-# global variables:
-# 	- key
-#   - roles
-# 
-# @param 1 - The host environment to source
-#
-_host_env() {
-	log_info "Sourcing host environment: $1"
-
-	key="default"
-	key() {
-		key=${1:-"default"}
-	}
-
-	roles=()
-	roles() {
-		roles+=( $* )
-	}
-
-	if [[ ! -f $rr_host_home/$1.sh ]] 
-	then
-		fail "Host file [$1] does not exist."
-	fi 
-
-	if ! source $rr_host_home/$1.sh
-	then
-		fail "Error sourcing host file [$host]"
-	fi
-
-	roles=( $(array_uniq "${roles[@]}") )
-
-	unset -f key
-	unset -f roles
-}
-
-# Given a list of roles, this method will source
-# all the role files and upadate the following global
-# attributes:
-#
-#   - attributes
-# 	- archives
-# 
-# @param 1..n - The roles to source.
-#
-_role_env() {
-	attributes=()
-	attr() {
-		attributes+=(["$1"]=$2)
-	}
-
-	archives=()
-	archives() {
-		archives+=( $* )
-	}
-
-	for role in "${@}"
-	do
-		if [[ ! -f $rr_role_home/$role.sh ]] 
-		then
-			fail "Unable to determine run list for host [$1].  Role [$role] does not exist."
-		fi 
-
-		if ! source $rr_role_home/$role.sh
-		then 
-			fail "Error sourcing role file [$role]: $err"
-		fi
-	done
-
-	archives=( $(array_uniq "${archives[@]}") )
-
-	unset -f attr
-	unset -f archives 
-}
-
-# Given a key name determine the keyfile and
-# add it to the ssh connection agent. This
-# will set the following global attributes:
-#
-# 	- key_file
-#
-# @param 1 - The name of the key
-#
-_key_env() {
-	key_file=$rr_key_home/id_rsa.$key
-
-	if [[ ! -f $key_file ]] 
-	then 
-		fail "That key file [$key_file] doesn't exist!"
-	fi
-
-	ssh-add $key_file
-	#if ! 
-	#then
-		##fail "Unable to source the key file [$key_file]"
-	#fi 
-}
-
-rr_tmp_local=${rr_tmp_local:-/tmp}
-rr_tmp_remote=${rr_tmp_remote:-/tmp}
-rr_home_remote=$rr_tmp_remote/rr
-
-# Given the target machine, this method will print the
-# runtime library to stdout.
-#
-# @param 1 - The target host.
-_runtime_lib() {
-	tar -cf $rr_tmp_local/rr.tar -C $rr_home remote && \
-		tar -f $rr_tmp_local/rr.tar -C $rr_home --append lib && \
-		tar -f $rr_tmp_local/rr.tar -C $rr_home --append dsl && \
-
-		{
-			echo "source $rr_home_remote/remote/require.sh"
-
-			for script in $rr_home/remote/*.sh
-			do
-				echo "require \"remote/$(basename $script)\""
-			done
-
-			for script in $rr_home/lib/*.sh
-			do
-				echo "require \"lib/$(basename $script)\""
-			done
-
-			for script in $rr_home/dsl/*.sh
-			do
-				echo "require \"dsl/$(basename $script)\""
-			done
-
-			for key in "${!attributes[@]}"
-			do
-				echo "$key=${attributes[$key]}"
-			done
-
-			for key in "${!globals[@]}"
-			do
-				echo "$key=${globals[$key]}"
-			done
-		} | cat > $rr_tmp_local/env.sh && \
-			tar -f $rr_tmp_local/rr.tar -C $rr_tmp_local --append env.sh && \
-			rm -fr $rr_tmp_local/env.sh
-
-		return $?
-}
-
-# 
-#
-# Copy over the runtime library to a particular
-# host.  This will copy an archive to the
-# remote host to: /tmp/archive.sh
-# 
-# The archive will consist of the following scripts:
-# 	- rr.sh - The runtime library.
-#   - archive_name::archive_script.sh - The archive script.  There 
-# 		will be one for each archive that will be executed on the
-# 		host
-# 	- execute.sh - A script to actually execute the archives,
-# 		and perform cleanup.	
-#
-# @param 1 - The host to which to transfer.
-# @param 2 - The identity key to use
-# @param 3..n - The archives to include in the copy.
-_remote_lib_copy() {
-	local host=$1
-	local key_file=$2
-	local archives=( ${@:3} )
-
-	log_info "Building archive library from archives: $(array_print ${archives[@]})"
-
-	_runtime_lib $host || fail "Failed to build runtime lib"
-
-	for archive in "${archives[@]}"
-	do
-		log_debug "Building archive library [$archive]"
-
-		local archive_name=$(_archive_get_name $archive)
-		local archive_script=$(_archive_get_script $archive)
-		local script=$rr_archive_home/$archive_name/scripts/$archive_script.sh
-
-		if [ ! -f $script ]
-		then
-			fail "Unable to locate archive [$archive]"
-		fi
-
-		if ! tar -tf $rr_tmp_local/rr.tar | grep "$archive_name/files" &> /dev/null
-		then
-			log_debug "The archive [$archive_name] has not been added to the runtime lib"
-			tar -f $rr_tmp_local/rr.tar -C $rr_archive_home --append $archive_name/files
-			tar -f $rr_tmp_local/rr.tar -C $rr_archive_home --append $archive_name/templates
-		fi
-
-		{
-			echo -ne "source $rr_home_remote/env.sh; $archive_name::$archive_script() { archive_name=$archive_name;"
-			cat $script
-			echo "}; $archive_name::$archive_script;"
-		} | cat -> $rr_tmp_local/$archive_name::$archive_script.sh  
-
-		tar -f $rr_tmp_local/rr.tar -C $rr_tmp_local --append $archive_name::$archive_script.sh && \
-			rm -f $rr_tmp_local/$archive_name::$archive_script.sh || \
-			fail "Error adding archive to runtime lib [$archive]"
-
-		cmd+="if [[ -z \$ret ]] || [[ \$ret -eq 0 ]]; then bash $rr_home_remote/$archive_name::$archive_script.sh; ret=\$?; fi;  " 
-	done
-
-	cmd+="exit \$ret"
-
-	log_debug "Building execute script."
-
-	(
-		echo "$cmd" > $rr_tmp_local/execute.sh && \
-			tar -f $rr_tmp_local/rr.tar -C $rr_tmp_local --append execute.sh && \
-			rm -f $rr_tmp_local/execute.sh 
-	) || fail "Error building execute script."
-
-
-	log_debug "Copying library to remote host [$host]"
-
-	(
-		scp -i $key_file $rr_tmp_local/rr.tar $host:/$rr_tmp_remote/rr_remote.tar && \
-		rm -f $rr_tmp_local/rr.tar 
-	) || fail "Error transferring archives to host [$host]"
-}
-
-# Execute the archive on the remote host. This function assumes
-# that the archive has been copied to the location at
-# /tmp/archive.sh and when expanded has a script called
-# execute.sh.
-#
-# @param 1 - The host to which to transfer.
-# @param 2 - The identity key to use
-# @param 3..n - The archives to include in the copy.
-_remote_lib_execute() {
-	local host=$1
-	local key_file=$2
-	local archives=( ${@:3} )
-
-	log_info "Executing archives on host [$host] : $( array_print ${archives[@]} )"
-
-	local cmd="mkdir -p $rr_home_remote; tar -xf $rr_tmp_remote/rr_remote.tar -C $rr_home_remote && "
-	if [[ -n $rr_sudo ]] && $rr_sudo 
-	then
-		cmd+="sudo "
-	fi
-
-	cmd+="bash $rr_home_remote/execute.sh; "
-	cmd+="ret=\$?; rm $rr_tmp_remote/rr_remote.tar; rm -fr $rr_home_remote; exit \$ret"
-	
-	ssh -t -i $key_file $host "$cmd"
-
-	ret=$?
-
-	if [ $ret -ne 0 ]
-	then
-		fail "Failed to remote execute archives on host [$host]: $( array_print ${archives[@]} )"
-	fi
-}
-
-execute() {
-	if [[ $# < 1 ]]
-	then
-		error "Must provide a host regexp."
-		exit 1
-	fi
-
-	while getopts ":l:a:p:s" opt 
-	do
-		case $opt in
-			l)
-				log_level=$OPTARG
-				;;
-			a) 
-				archive+=( $OPTARG )
-				;;
-			p) 
-				rr_archive_home=$OPTARG 
-				;;
-			s)
-				rr_sudo=true 
-		esac 
-	done
-
-	local host_list=()
-	for host_regexp in "${@}"
-	do
-		host_list+=( $( _host_match $host_regexp) )
-	done
-	host_list=( $(array_uniq ${host_list[@]}) )
-
-	log_info "Hosts have expanded to: $(array_print "${host_list[@]}") "
-	for host in "${host_list[@]}"
-	do
-		(
-		# Source the host file.  This will set the following
-		# global variables:
-		# 	- key
-		#   - roles
-		#
-		_host_env $host
-
-		# Source the roles.  This will set the following
-		# global variables:
-		#   - attributes
-		#   - archives
-		#
-		_role_env ${roles[@]}
-
-		if [[ -n $archive ]]
-		then
-			archives=( "${archive[@]}" )
-		fi
-
-		log_info "Runlist has expanded to: $(array_print ${archives[@]}) "
-
-
-		# Check to see if any archives have been applied to
-		# this host.  If not, then we don't need to continue
-		if [[ ${#archives} == 0 ]] 
-		then
-			log_info "No archives to execute."
-			exit 0
-		fi
-
-		# Determine the necessary ssh key to use to 
-		# run on this host.  Add the identity file
-		# to limit the number of times that the passphrase
-		# is requested. This will set the following 
-		# global variables:
-		# 	- key_file
-		#
-		_key_env $key
-
-		_remote_lib_copy $host $key_file "${archives[@]}"
-		_remote_lib_execute $host $key_file "${archives[@]}"
-
-		) || fail "Error executing host [$host] runlist."
-	done
-}
 
 
 help() {
 	info "** Global Commands **"
 
-	echo 
-	echo "rr [options] [HOST] [HOST]*"
-	echo
-
-	local subcommands=( key host role archive )
+	local subcommands=( run key host role archive )
 	for cmd in "${subcommands[@]}" 
 	do
 		"$cmd"_help
@@ -376,19 +32,15 @@ help() {
 	done
 }
 
-
 args=($*)
 action="${args[0]}"
 shift
 
 case "$action" in
-	key|host|role|archive)
+	key|host|role|archive|run)
 		"$action"_action "$@"
 		;;
-	help)
+	*)
 		help
 		;;	
-	*)
-		execute "${args[@]}" 
-		;;
 esac

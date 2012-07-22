@@ -1,6 +1,6 @@
 # Logs an error message and shows a simple stacktrace.  
 fail() {
-	echo "An error occurred: $*" 1>&2
+	echo "An error occurred: $1" 1>&2
 
 	local frame=0
 	while caller $frame; do

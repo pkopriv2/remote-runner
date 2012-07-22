@@ -1,10 +1,32 @@
 #! /bin/bash
 
 require "lib/dir.sh"
-require "local/msg.sh"
+require "lib/msg.sh"
 
 rr_key_home=${rr_key_home:-$rr_home/keys}
 dir_create_if_missing "$rr_key_home"
+
+# Given a key name determine the keyfile and
+# add it to the ssh connection agent. This
+# will set the following global attributes:
+#
+# 	- key_file
+#
+# @param 1 - The name of the key
+#
+_source_key() {
+	key_file=$rr_key_home/id_rsa.$1
+
+	if [[ ! -f $key_file ]] 
+	then 
+		fail "That key file [$key_file] doesn't exist!"
+	fi
+	
+	if ! ssh-add $key_file &> /dev/null
+	then
+		fail "Unable to source the key file [$key_file]"
+	fi 
+}
 
 # Generate a public/private key pair
 # 
