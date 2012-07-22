@@ -55,6 +55,8 @@ host_list() {
 	done
 }
 
+# Simple lists of all the bootstrapped hosts.
+#
 _host_list() {
 	local list=($(builtin cd "$rr_host_home" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
 
@@ -64,9 +66,23 @@ _host_list() {
 	done
 }
 
-# Given a regexp string, return all the hosts
+# Given a list of regexps, return all the hosts
 # that match.
 #
+_host_matchall() {
+	local hosts=()
+
+	while [[ $# -gt 0 ]]
+	do
+		hosts+=( $( _host_match "$1") )
+		shift
+	done
+
+	array_uniq "${hosts[@]}"
+}
+
+# Given a regexp string, return all the hosts
+# that match.
 #
 _host_match() {
 	if [[ -z $1 ]]

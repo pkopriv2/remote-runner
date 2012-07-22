@@ -2,7 +2,6 @@ require "lib/array.sh"
 
 log_level=${log_level:-INFO}
 
-
 debug_levels=( DEBUG )
 log_debug() {
 	if ! array_contains "$log_level" "${debug_levels[@]}" 

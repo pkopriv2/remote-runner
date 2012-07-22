@@ -12,35 +12,31 @@ declare -A attributes
 
 require "lib/msg.sh"
 
-require "host.sh"
-require "key.sh"
-require "role.sh"
-require "archive.sh"
-require "run.sh"
-
 IFS=$'\n'
 
-
 help() {
-	info "** Global Commands **"
+	info "** SubCommands **"
 
-	local subcommands=( run key host role archive )
+	local subcommands=( run cmd key host role archive )
 	for cmd in "${subcommands[@]}" 
 	do
-		"$cmd"_help
+		require "$cmd.sh" 
+		"$cmd"_help "${@}"
 		echo 
 	done
 }
 
-args=($*)
+args=( "${@}" )
 action="${args[0]}"
 shift
 
 case "$action" in
-	key|host|role|archive|run)
-		"$action"_action "$@"
+	key|host|role|archive|run|cmd)
+		require "$action.sh" 
+
+		"$action"_action "${@}"
 		;;
 	*)
-		help
+		help "${@}"
 		;;	
 esac

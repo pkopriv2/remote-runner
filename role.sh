@@ -6,6 +6,8 @@ require "lib/dir.sh"
 rr_role_home=${rr_role_home:-$rr_home/roles}
 dir_create_if_missing "$rr_role_home"
 
+declare -A attributes
+
 # Given a list of roles, this method will source
 # all the role files and upadate the following global
 # attributes:

@@ -3,11 +3,9 @@
 set -o errtrace
 set +o noglob 
 
-declare -A attributes
-
 rr_tmp_local=${rr_tmp_local:-/tmp}
 rr_tmp_remote=${rr_tmp_remote:-/tmp}
-
+rr_cmd_sudo=false
 
 require "local/log.sh"
 require "lib/msg.sh"
@@ -157,7 +155,7 @@ _lib_run() {
 	local cmd=$( 
 		cat - <<-CMD
 			tar -xf $rr_tmp_remote/rr_tmp.tar -C $rr_tmp_remote
-			if $sudo 
+			if $rr_cmd_sudo 
 			then
 				sudo bash $rr_tmp_remote/rr/run.sh
 			else
@@ -170,17 +168,16 @@ _lib_run() {
 }
 
 run() {
-	host_regexps=()
-
-	tmp_roles=()
+	local host_regexps=()
+	local tmp_roles=()
+	local tmp_archives=()
 	
-	sudo=false
 	while [[ $# -gt 0 ]]
 	do
 		arg="$1"
 
 		case "$arg" in
-			-l|--log_level)
+			-l|--log-level)
 				shift
 				log_level="$1"
 				;;
@@ -188,8 +185,16 @@ run() {
 				shift
 				tmp_roles+=( "$1" )
 				;;
+			-a|--archives)
+				shift
+				tmp_archives+=( "$1" )
+				;;
+			-h|--host)
+				shift
+				host_regexps+=( "$1" )
+				;;
 			-s|--sudo)
-				sudo=true
+				rr_cmd_sudo=true
 				;;
 			*)
 				host_regexps+=( "$1" )
@@ -200,14 +205,13 @@ run() {
 
 	log_debug "Collecting hosts that match: $(array_print "${host_regexps[@]}")"
 
-	local hosts=()
-	for host_regexp in "${host_regexps[@]}"
-	do
-		hosts+=( $( _host_match $host_regexp) )
-	done
+	if [[ ${#host_regexps[@]} -eq 0 ]]
+	then
+		error "Must provide at least one host regexp."
+		exit 1
+	fi
 
-	hosts=( $(array_uniq ${hosts[@]}) )
-
+	local hosts=$( _host_matchall "${host_regexps[@]}" )
 	log_info "Hosts have expanded to: $(array_print "${hosts[@]}")"
 
 	for host in "${hosts[@]}"
@@ -233,6 +237,12 @@ run() {
 		#
 		_source_roles ${roles[@]}
 
+		# if archives were provided as arguments then use those.
+		if [[ ${#tmp_archives[@]} -gt 0 ]]
+		then
+			archives=$tmp_archives
+		fi
+
 		# Determine the necessary ssh key to use to 
 		# run on this host.  Add the identity file
 		# to limit the number of times that the passphrase
@@ -252,7 +262,10 @@ run() {
 			exit 0
 		fi
 
+		# create the library
 		_lib_create "${archives[@]}"
+
+		# finally run the library on the remote host.
 		_lib_run $host $key_file
 
 		) || fail "Error executing host [$host] runlist."
@@ -261,18 +274,48 @@ run() {
 
 
 run_help() {
-	info "Usage: rr run [options] regexp [regexp]*"
-	echo 
+	local detailed=false
+	while [[ $# -gt 0 ]]
+	do
+		arg="$1"
 
+		case "$arg" in
+			-d|--detailed)
+				detailed=true
+				;;
+		esac
+		shift
+	done
+
+	echo "rr run [options] host1 .. hostn"
+
+	if ! $detailed 
+	then
+		return 0
+	fi
+
+	printf "%s\n" "
+OPTIONS:
+  -h|--host    The hosts on which to run. 
+  -r|--role    The roles to source.  Multiple may be provived. This 
+               overrides any roles in the host files.
+
+  -a|--archive The archive to run.  Multiple may be provided.  This 
+               overrides any archives in the role files.
+
+  -s|--sudo    Execute the runlist as the sudo root user.  If the sudo 
+               user requires a password, this cannot be daemonized.
+"
+	echo 
 }
 
 run_action() {
-	args=($*)
+	args=( "${@}" )
 	action="${args[0]}"
 
 	case "$action" in
 		help)
-			run_help 
+			run_help --detailed
 			;;
 		*)
 			run "${args[@]}"

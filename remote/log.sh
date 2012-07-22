@@ -10,7 +10,7 @@ log_debug() {
 		return 0
 	fi
 
-	echo -e "$(tput setaf 5)[REMOTE] [DEBUG]$(tput sgr0): $1"
+	echo -e "$(tput setaf 5)[$HOSTNAME] [DEBUG]$(tput sgr0): $1"
 }
 
 # Logs a message out in a friendly green color if 
@@ -25,9 +25,9 @@ log_info() {
 
 	if ! tput setaf &> /dev/null
 	then
-		echo -e "[REMOTE] [INFO]: $1"
+		echo -e "[$HOSTNAME] [INFO]: $1"
 	else
-		echo -e "$(tput setaf 5)[REMOTE] [INFO]$(tput sgr0): $1"
+		echo -e "$(tput setaf 5)[$HOSTNAME] [INFO]$(tput sgr0): $1"
 	fi
 }
 
@@ -44,8 +44,8 @@ log_error() {
 
 	if ! tput setaf &> /dev/null
 	then
-		echo [REMOTE]: $1 >&2
+		echo [$HOSTNAME]: $1 >&2
 	else
-		echo -e "$(tput setaf 1)[REMOTE]$(tput sgr0): $1" >&2
+		echo -e "$(tput setaf 1)[$HOSTNAME]$(tput sgr0): $1" >&2
 	fi
 }

@@ -1,0 +1,15 @@
+[32m[LOCAL] [DEBUG][m(B: Collecting hosts that match: ( . )
+[32m[LOCAL] [INFO][m(B: Hosts have expanded to: ( pkopriv2@localhost )
+[32m[LOCAL] [INFO][m(B: Sourcing host environment: pkopriv2@localhost
+[32m[LOCAL] [INFO][m(B: Runlist has expanded to: ( ) 
+[32m[LOCAL] [INFO][m(B: No archives to execute.
+[32m[LOCAL] [DEBUG][m(B: Collecting hosts that match: ( . )
+[32m[LOCAL] [INFO][m(B: Hosts have expanded to: ( pkopriv2@localhost )
+[32m[LOCAL] [INFO][m(B: Sourcing host environment: pkopriv2@localhost
+[32m[LOCAL] [INFO][m(B: Runlist has expanded to: ( ) 
+[32m[LOCAL] [INFO][m(B: No archives to execute.
+[32m[LOCAL] [DEBUG][m(B: Collecting hosts that match: ( . )
+[32m[LOCAL] [INFO][m(B: Hosts have expanded to: ( pkopriv2@localhost )
+[32m[LOCAL] [INFO][m(B: Sourcing host environment: pkopriv2@localhost
+[32m[LOCAL] [INFO][m(B: Runlist has expanded to: ( ) 
+[32m[LOCAL] [INFO][m(B: No archives to execute.

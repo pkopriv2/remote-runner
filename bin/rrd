@@ -4,60 +4,18 @@ source $rr_home/require.sh
 
 require "lib/msg.sh" 
 
-rrd_list() {
-	info "Active instances:"
-
-	ps -A -o pid -o etime -o args \
-		| grep '\(PID\|rrd\)' | grep -v 'grep' | grep -v "$$"
-}
-
-rrd_killall() {
-	ps -A -o pid -o args \
-		| grep 'rrd' | grep -v 'grep' | grep -v "$$" \
-		| awk '{print $1;}' | xargs kill
-}
-
-rrd_start() {
-	info "Starting rrd: $*"
-
-	args=()
-	while [[ $# -gt 0 ]]
-	do
-		arg="$1"
-
-		case "$arg" in
-			--period)
-				shift
-				period="$1"
-				;;
-			--log-file) 
-				shift 
-				log_file="$1"
-				;;
-			*)
-				args+=( "$1" )
-				;;
-		esac
-		shift
-	done
-
-	(
-		while true
-		do
-			rr run "${args[@]}" 
-			sleep ${period:-30}
-		done
-	) &>> ${log_file:-rr.out} &
-}
-
 rrd_help() {
 	info "** Usage **" 
+
 	echo "rrd [options] [rr run options]"
 
 	printf "%s\n" "
 OPTIONS:
-  --period     The time to wait between invocations.
-  --log-file   The output log file.
+  -p|--period      	The time to wait between invocations.
+  -o|--log-file   	The output log file.
+  -s|--sub-command  The subcommand of rr to run.  Can be one of: (cmd run). Default: run
+
+  Any subsequent options are passed to the respective subcommand.
 "
 
 	info "** Sub Commands **"
@@ -70,7 +28,68 @@ OPTIONS:
 
 }
 
-args=($*)
+# Lists all of the active instances of rrd. Each instance will be 
+# displayed with the following columns:
+# 	* PID 		The process id
+#   * ELAPSED 	The time that the daemon has been running.
+#   * COMMAND   A detailed view of how the daemon was invoked.
+#
+rrd_list() {
+	info "Active instances:"
+
+	ps -A -o pid -o etime -o args \
+		| grep '\(PID\|rrd\)' | grep -v 'grep' | grep -v "$$"
+}
+
+# Kills all the instances of rrd.
+#
+rrd_killall() {
+	ps -A -o pid -o args \
+		| grep 'rrd' | grep -v 'grep' | grep -v "$$" \
+		| awk '{print $1;}' | xargs kill
+}
+
+# Starts a new instance of rrd. 
+#
+rrd_start() {
+	info "Starting rrd."
+
+	local args=()
+	local subcommand=run
+	while [[ $# -gt 0 ]]
+	do
+		arg="$1"
+
+		case "$arg" in
+			-p|--period)
+				shift
+				period="$1"
+				;;
+			-o|--log-file) 
+				shift 
+				log_file="$1"
+				;;
+			-s|--sub-command) 
+				shift 
+				subcommand="$1"
+				;;
+			*)
+				args+=( "$1" )
+				;;
+		esac
+		shift
+	done
+
+	(
+		while true
+		do
+			rr $subcommand "${args[@]}" 
+			sleep ${period:-30}
+		done
+	) &>> ${log_file:-rr.out} &
+}
+
+args=( "${@}" )
 action="${args[0]}"
 shift
 

@@ -6,7 +6,9 @@ rr_host_home=${rr_host_home:-$rr_home/hosts}
 rr_key_home=${rr_key_home:-$rr_home/keys}
 rr_role_home=${rr_role_home:-$rr_home/roles}
 
-. $rr_home/local/msg.sh 
+source $rr_home/require.sh
+
+require "lib/msg.sh"
 
 rrcd() {
 	if [[ -z $1 ]]
