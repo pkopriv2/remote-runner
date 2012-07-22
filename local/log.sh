@@ -9,7 +9,7 @@ log_debug() {
 		return 0
 	fi
 
-	echo -e "$(tput setaf 2)[LOCAL] [DEBUG]$(tput sgr0): $1"
+	echo -e "$(tput setaf 2)[LOCAL] [$$] [DEBUG]$(tput sgr0): $1"
 }
 
 # Logs a message out in a friendly green color if 
@@ -26,7 +26,7 @@ log_info() {
 	then
 		echo -e "[LOCAL] [INFO]: $1"
 	else
-		echo -e "$(tput setaf 2)[LOCAL] [INFO]$(tput sgr0): $1"
+		echo -e "$(tput setaf 2)[LOCAL] [$$] [INFO]$(tput sgr0): $1"
 	fi
 }
 
@@ -45,6 +45,6 @@ log_error() {
 	then
 		echo [LOCAL]: $1 >&2
 	else
-		echo -e "$(tput setaf 1)[LOCAL]$(tput sgr0): $1" >&2
+		echo -e "$(tput setaf 1)[LOCAL] [$$] [ERROR] $(tput sgr0): $1" >&2
 	fi
 }

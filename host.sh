@@ -249,7 +249,7 @@ host_help() {
 
 
 host_action() {
-	args=($*)
+	args=( "${@}" )
 	action="${args[0]}"
 	unset args[0]
 

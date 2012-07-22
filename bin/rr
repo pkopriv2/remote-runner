@@ -1,9 +1,9 @@
 #! /bin/bash -f
 
 export rr_home=${rr_home:-$HOME/.rr}
-export rr_host_home=${rr_host_home:-$rr_home/hosts}
-export rr_archive_home=${rr_archive_home:-$rr_home/archives}
-export rr_role_home=${rr_role_home:-$rr_home/roles}
+#export rr_host_home=${rr_host_home:-$rr_home/hosts}
+#export rr_archive_home=${rr_archive_home:-$rr_home/archives}
+#export rr_role_home=${rr_role_home:-$rr_home/roles}
 
 source $rr_home/require.sh
 
@@ -15,7 +15,8 @@ require "lib/msg.sh"
 IFS=$'\n'
 
 help() {
-	info "** SubCommands **"
+	info "** Remote-Runner Help **"
+	echo 
 
 	local subcommands=( run cmd key host role archive )
 	for cmd in "${subcommands[@]}" 

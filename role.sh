@@ -2,6 +2,7 @@
 
 require "lib/msg.sh"
 require "lib/dir.sh"
+require "lib/array.sh"
 
 rr_role_home=${rr_role_home:-$rr_home/roles}
 dir_create_if_missing "$rr_role_home"
@@ -67,6 +68,37 @@ role_create() {
 	fi
 }
 
+
+# Install a role file
+# 
+# @param name The name of the role to create [default="default"]
+#
+role_install() {
+	if [[ -z $1 ]]
+	then
+		error "Must supply an role name."
+		exit 1
+	fi
+
+	if [[ ! -f $1 ]]
+	then
+		error "Directory [$1] doesn't exist."
+		exit 1
+	fi 
+	
+	info "Installing role [$1]."
+
+	path=$(builtin cd $(dirname $1); pwd)
+
+	if ! ln -s $path/$(basename $1) $rr_role_home &> /dev/null
+	then
+		error "Error installing role [$1]."
+		exit 1
+	fi 
+	
+	info "Successfully installed role [$1]"
+}
+
 # Edit a role file with the environment $EDITOR program
 # 
 # @param name The name of the role to edit [default="default"]
@@ -97,7 +129,23 @@ role_show() {
 		exit 1
 	fi
 
-	cat $role_file
+	(
+		_source_roles $1
+
+		info "Archives:"
+		for archive in "${archives[@]}"
+		do
+			echo "    -$archive"
+		done
+
+		echo
+
+		info "Attributes:"
+		for key in "${!attributes[@]}"
+		do
+			echo "    - $key => ${attributes[$key]}"
+		done
+	)
 }
 
 # Get the value of a public role
@@ -151,7 +199,7 @@ role_help() {
 		echo "rr role $method [options]*"
 	done
 
-	methods=( show edit delete )
+	methods=( show edit delete install )
 	for method in "${methods[@]}" 
 	do
 		echo "rr role $method [options]* [ROLE]"
@@ -162,12 +210,12 @@ role_help() {
 #
 #
 role_action() {
-	args=($*)
+	args=( "${@}" )
 	action="${args[0]}"
 	unset args[0]
 
 	case "$action" in
-		list|show|create|delete|edit)
+		list|show|create|delete|edit|install)
 			role_$action "${args[@]}"
 			;;
 		*)

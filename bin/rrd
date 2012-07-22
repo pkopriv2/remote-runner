@@ -3,6 +3,7 @@
 source $rr_home/require.sh
 
 require "lib/msg.sh" 
+require "local/log.sh" 
 
 rrd_help() {
 	info "** Usage **" 
@@ -25,7 +26,6 @@ OPTIONS:
 	do
 		echo "rrd $method"
 	done
-
 }
 
 # Lists all of the active instances of rrd. Each instance will be 
@@ -83,7 +83,13 @@ rrd_start() {
 	(
 		while true
 		do
-			rr $subcommand "${args[@]}" 
+			log_info "Running command: rr $subcommand ${args[@]}"
+
+			if ! rr $subcommand "${args[@]}" 
+			then
+				exit 1
+			fi
+
 			sleep ${period:-30}
 		done
 	) &>> ${log_file:-rr.out} &
