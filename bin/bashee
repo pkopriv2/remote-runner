@@ -44,7 +44,8 @@ delim=${bashee_delim:-"--"}
 		then
 			cmd=false
 			echo "cat - <<-EOF"
-			echo $line | sed 's|\$|\\$|g'
+			echo $line
+			#echo $line | sed 's|\$|\\$|g' # should inline variables resolve? yes, for now
 			continue
 		fi
 
@@ -67,7 +68,8 @@ delim=${bashee_delim:-"--"}
 		then
 			echo $line
 		else
-			echo $line | sed 's|\$|\\$|g'
+			#echo $line | sed 's|\$|\\$|g' # should inline variables resolve? yes, for now
+			echo $line
 		fi
 			
 	done < $file

@@ -45,6 +45,6 @@ log_error() {
 	then
 		echo [LOCAL]: $1 >&2
 	else
-		echo -e "$(tput setaf 1)[LOCAL] [$$] [ERROR] $(tput sgr0): $1" >&2
+		echo -e "$(tput setaf 2)[LOCAL] [$$] [ERROR] $(tput sgr0): $1" >&2
 	fi
 }

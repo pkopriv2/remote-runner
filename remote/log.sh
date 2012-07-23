@@ -1,6 +1,7 @@
 require "lib/array.sh"
 
 log_level=${log_level:-INFO}
+rr_pid=${rr_pid:-"-1"}
 
 
 debug_levels=( DEBUG )
@@ -10,7 +11,12 @@ log_debug() {
 		return 0
 	fi
 
-	echo -e "$(tput setaf 5)[$HOSTNAME] [DEBUG]$(tput sgr0): $1"
+	if ! tput setaf &> /dev/null
+	then
+		echo -e "[$HOSTNAME] [$rr_pid] [DEBUG]: $1"
+	else
+		echo -e "$(tput setaf 5)[$HOSTNAME] [$rr_pid] [DEBUG]$(tput sgr0): $1"
+	fi
 }
 
 # Logs a message out in a friendly green color if 
@@ -25,9 +31,9 @@ log_info() {
 
 	if ! tput setaf &> /dev/null
 	then
-		echo -e "[$HOSTNAME] [INFO]: $1"
+		echo -e "[$HOSTNAME] [$rr_pid] [INFO]: $1"
 	else
-		echo -e "$(tput setaf 5)[$HOSTNAME] [INFO]$(tput sgr0): $1"
+		echo -e "$(tput setaf 5)[$HOSTNAME] [$rr_pid] [INFO]$(tput sgr0): $1"
 	fi
 }
 
@@ -44,8 +50,8 @@ log_error() {
 
 	if ! tput setaf &> /dev/null
 	then
-		echo [$HOSTNAME]: $1 >&2
+		echo [$HOSTNAME] [$rr_pid] [ERROR]: $1 >&2
 	else
-		echo -e "$(tput setaf 1)[$HOSTNAME]$(tput sgr0): $1" >&2
+		echo -e "$(tput setaf 5)[$HOSTNAME] [$rr_pid] [ERROR]$(tput sgr0): $1" >&2
 	fi
 }

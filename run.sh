@@ -16,6 +16,11 @@ require "key.sh"
 require "role.sh"
 require "archive.sh"
 
+if [[ -f $rr_tmp_local/rr.tar ]]
+then
+	rm -f $rr_tmp_local/rr.tar
+fi
+
 on_exit() {
 	rm -f $rr_tmp_local/rr.tar
 	rm -f $rr_tmp_local/run.sh
@@ -26,35 +31,37 @@ trap 'on_exit' EXIT INT
 
 # Given a list of archives, this function generates the library to be run 
 # on the remote host. The library will take the form:
-#  	* rr/
-#   * rr/lib/*
-#   * rr/dsl/*
-#   * rr/remote/*
-#   * rr/archives/*
+#	* rr/
+#	* rr/lib/*
+#	* rr/dsl/*
+#	* rr/remote/*
+#	* rr/archives/*
 #
 _lib_create() {
-	local archives=( ${@} )
+	local archives=( "${@}" )
 
 	log_info "Building archive library from archives: $(array_print ${archives[@]})"
 
 	# add the standard library files.
 	griswold -o $rr_tmp_local/rr.tar  \
-			 -C $rr_home 			  \
-		     -b rr  				  \
-			 require.sh 		      \
-			 lib 					  \
-			 dsl 					  \
-			 remote 					  
+			 -C $rr_home			  \
+			 -b rr					  \
+			 require.sh				  \
+			 bin/bashee				  \
+			 bin/griswold			  \
+			 lib					  \
+			 dsl					  \
+			 remote
 
 	# start building the "run" script
 	{
 		echo "set -o errtrace"
-		echo "set -o allexport"
+		echo "set -o allexport" 
 		echo 
 
 		cat -<<-EOH
 			on_error() {
-				echo "An error occurred." 1>&2
+				echo "Exiting script." 1>&2
 				caller 0					
 				exit 1
 			}
@@ -71,7 +78,11 @@ _lib_create() {
 
 		echo 
 		echo "rr_home=$rr_tmp_remote/rr"
+		echo "rr_home_remote=\$rr_home"
+		echo "rr_pid=$$"
 		echo 
+
+		echo "PATH=\$rr_home/bin:\$PATH"
 
 		echo "source \$rr_home/require.sh"
 		echo 
@@ -103,6 +114,7 @@ _lib_create() {
 		echo
 	} | cat - > $rr_tmp_local/run.sh
 
+
 	# add each archive to the library (and add their invocations to the run script)
 	for archive in "${archives[@]}"
 	do
@@ -117,27 +129,28 @@ _lib_create() {
 		local archive_script=$(_archive_get_script $archive)
 		if [ ! -f $rr_archive_home/$archive_name/scripts/$archive_script.sh ]
 		then
-			fail "Unable to locate archive [$archive]"
+			fail "Unable to locate archive script [$archive_script]"
 		fi
 
-		if ! tar -tf $rr_tmp_local/rr.tar | grep -q "$archive_name"
+		if ! tar -tf $rr_tmp_local/rr.tar | grep -q "archives\/$archive_name"
 		then
 			log_debug "The archive [$archive_name] has not been added."
 
 			griswold -o $rr_tmp_local/rr.tar  \
-					 -c $rr_archive_home 	  \
-					 -b rr/archives 		  \
-					 $archive_name 					
+					 -c $rr_archive_home	  \
+					 -b rr/archives			  \
+					 $archive_name					
 		fi
 
 		{
+			echo "archive_name=$archive_name"
 			echo "source \$rr_home/archives/$archive_name/scripts/$archive_script.sh"
 		} | cat ->> $rr_tmp_local/run.sh
 	done
 
 	griswold -o $rr_tmp_local/rr.tar  \
-			 -c $rr_tmp_local 	      \
-			 -b rr 					  \
+			 -c $rr_tmp_local		  \
+			 -b rr					  \
 			 run.sh
 
 	rm -f $rr_tmp_local/run.sh
@@ -154,7 +167,7 @@ _lib_run() {
 
 	local cmd=$( 
 		cat - <<-CMD
-			tar -xf $rr_tmp_remote/rr_tmp.tar -C $rr_tmp_remote
+			tar -pxf $rr_tmp_remote/rr_tmp.tar -C $rr_tmp_remote
 			if $rr_cmd_sudo 
 			then
 				sudo bash $rr_tmp_remote/rr/run.sh
@@ -164,7 +177,7 @@ _lib_run() {
 		CMD
 	)
 
-	ssh -t -i $key_file $1 "$cmd"
+	ssh -q -t -i $key_file $1 "$cmd"
 }
 
 run() {
@@ -219,8 +232,8 @@ run() {
 		(
 		# Source the host file.  This will set the following
 		# global variables:
-		# 	- key
-		#   - roles
+		#	- key
+		#	- roles
 		#
 		_source_host $host
 
@@ -232,8 +245,8 @@ run() {
 
 		# Source the roles.  This will set the following
 		# global variables:
-		#   - attributes
-		#   - archives
+		#	- attributes
+		#	- archives
 		#
 		_source_roles ${roles[@]}
 
@@ -248,7 +261,7 @@ run() {
 		# to limit the number of times that the passphrase
 		# is requested. This will set the following 
 		# global variables:
-		# 	- key_file
+		#	- key_file
 		#
 		_source_key $key
 
@@ -298,13 +311,13 @@ run_help() {
 OPTIONS:
   -h|--host    The hosts on which to run. 
   -r|--role    The roles to source.  Multiple may be provived. This 
-               overrides any roles in the host files.
+			   overrides any roles in the host files.
 
-  -a|--archive The archive to run.  Multiple may be provided.  This 
-               overrides any archives in the role files.
+  -a|--archive The archive to run.	Multiple may be provided.  This 
+			   overrides any archives in the role files.
 
   -s|--sudo    Execute the runlist as the sudo root user.  If the sudo 
-               user requires a password, this cannot be daemonized.
+			   user requires a password, this cannot be daemonized.
 "
 	echo 
 }

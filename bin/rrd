@@ -5,29 +5,6 @@ source $rr_home/require.sh
 require "lib/msg.sh" 
 require "local/log.sh" 
 
-rrd_help() {
-	info "** Usage **" 
-
-	echo "rrd [options] [rr run options]"
-
-	printf "%s\n" "
-OPTIONS:
-  -p|--period      	The time to wait between invocations.
-  -o|--log-file   	The output log file.
-  -s|--sub-command  The subcommand of rr to run.  Can be one of: (cmd run). Default: run
-
-  Any subsequent options are passed to the respective subcommand.
-"
-
-	info "** Sub Commands **"
-
-	local methods=( list killall )
-	for method in "${methods[@]}" 
-	do
-		echo "rrd $method"
-	done
-}
-
 # Lists all of the active instances of rrd. Each instance will be 
 # displayed with the following columns:
 # 	* PID 		The process id
@@ -87,12 +64,36 @@ rrd_start() {
 
 			if ! rr $subcommand "${args[@]}" 
 			then
+				log_error "Error executing command: rr $subcommand ${args[@]}"
 				exit 1
 			fi
 
-			sleep ${period:-30}
+			sleep ${period:-1800}
 		done
 	) &>> ${log_file:-rr.out} &
+}
+
+rrd_help() {
+	info "** Usage **" 
+
+	echo "rrd [options] [rr run options]"
+
+	printf "%s\n" "
+OPTIONS:
+  -p|--period      	The time to wait between invocations.
+  -o|--log-file   	The output log file.
+  -s|--sub-command  The subcommand of rr to run.  Can be one of: (cmd run). Default: run
+
+  Any subsequent options are passed to the respective subcommand.
+"
+
+	info "** Sub Commands **"
+
+	local methods=( list killall )
+	for method in "${methods[@]}" 
+	do
+		echo "rrd $method"
+	done
 }
 
 args=( "${@}" )

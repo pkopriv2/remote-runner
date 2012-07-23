@@ -3,8 +3,14 @@ fail() {
 	echo "An error occurred: $1" 1>&2
 
 	local frame=0
-	while caller $frame; do
-		((frame++));
+	while true 
+	do
+		if ! caller $frame
+		then
+			break
+		fi
+
+		let frame=frame+1 # (( frame++ )) will trigger an error.
 	done
 
 	exit 1
