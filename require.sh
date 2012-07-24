@@ -8,7 +8,7 @@ require() {
 	local script=$rr_home/$1
 	if [[ ! -f "$script" ]]
 	then
-		echo "Unable to locate script: $script"
+		echo "Unable to locate script: $script" 1>&2 
 		exit 1
 	fi
 
@@ -17,5 +17,5 @@ require() {
 		return
 	fi
 	
-	. $script && requires["$script"]="1"
+	source $script && requires["$script"]="1"
 }

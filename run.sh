@@ -9,6 +9,7 @@ rr_cmd_sudo=false
 
 require "local/log.sh"
 require "lib/msg.sh"
+require "lib/msg.sh"
 require "lib/array.sh"
 
 require "host.sh"

@@ -1,5 +1,7 @@
 #! /bin/bash
 
+require "lib/ebash.sh"
+
 file() {
 	log_info "Creating file [$1]"
 
@@ -57,7 +59,7 @@ file() {
 			fail "Template [$template_src] does not exist in archive [$archive_name]"
 		fi 
 
-		env bashee $template_file > $path
+		ebash_process_file $template_file > $path
 
 	elif [[ ! -z $file_src ]]
 	then
