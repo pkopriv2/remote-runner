@@ -3,7 +3,7 @@
 source $rr_home/require.sh
 
 require "lib/msg.sh" 
-require "local/log.sh" 
+require "lib/log.sh" 
 
 # Lists all of the active instances of rrd. Each instance will be 
 # displayed with the following columns:

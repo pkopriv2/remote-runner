@@ -3,7 +3,7 @@
 set -o errtrace
 set +o noglob 
 
-require "local/log.sh"
+require "lib/log.sh"
 require "lib/fail.sh"
 require "lib/dir.sh"
 require "lib/msg.sh"
@@ -16,8 +16,10 @@ require "key.sh"
 
 rr_tmp_local=${rr_tmp_local:-/tmp}
 rr_tmp_remote=${rr_tmp_remote:-/tmp}
-rr_cmd_local=$rr_tmp_local/rr_cmd
-rr_cmd_sudo=false
+rr_remote_file=${rr_remote_file:-$rr_tmp_remote/rr_remote_cmd.tmp}
+rr_cmd_local=${rr_cmd_loca:-$rr_tmp_local/rr_cmd}
+rr_cmd_opts=()
+rr_source=true
 
 on_exit() {
 	rm -f $rr_cmd_local
@@ -54,44 +56,43 @@ OPTIONS:
   -s|--sudo      Run the command/script as the sudo root user.
   -e|--editor    Open an editor to get the command.
   -l|--log-level Set the local log level.  Can be one of: DEBUG INFO ERROR
+  --no-color     Suppress color output.
 "
 }
 
 _script_run() {
 	local login=$1
-	local key_file=$2
-	local script=$3
-	local user=$(login_get_user "$login")
+	local script=$2
+	local key_file=$3
 
 	log_info "Executing command on host [$host]"
 
-	local remote_file=$rr_tmp_remote/rr_remote_cmd.tmp
-
 	local cmd=$( 
-		cat - <<-CMD
-			cat - > $remote_file <<-EOH
+		cat - <<-OUTERCMD
+			on_tmp_exit() {
+				rm $rr_remote_file
+			}
+
+			trap 'on_tmp_exit' INT EXIT
+
+			cat - > $rr_remote_file <<-EOH
 				$(cat $script)
 			EOH
 
-			chmod +x $remote_file 
+			chmod +x $rr_remote_file 
 
-			if $rr_cmd_sudo 
-			then
-				sudo $remote_file
-			else 
-				$remote_file
-			fi
-
-			rm $remote_file
-		CMD
+			$rr_remote_file
+		OUTERCMD
 	)
 
-	ssh -t -i $key_file $login "$cmd"
+	ssh -q -t -i $key_file $login "${rr_cmd_opts[*]} bash -l -c \"$cmd\""
 }
 
 cmd() {
 	local host_regexps=()
 
+	declare script
+	declare cmd
 	
 	while [[ $# -gt 0 ]]
 	do
@@ -100,7 +101,10 @@ cmd() {
 		case "$arg" in
 			-l|--log-level)
 				shift
-				log_level="$1"
+				rr_log_level="$1"
+				;;
+			--no-color)
+				rr_log_color=false
 				;;
 			-c|--cmd)
 				shift
@@ -108,10 +112,10 @@ cmd() {
 				;;
 			-f|--file)
 				shift
-				file=$1
+				script=$1
 				;;
 			-s|--sudo)
-				rr_cmd_sudo=true
+				rr_cmd_opts+=( sudo )
 				;;
 			-h|--host)
 				shift
@@ -119,7 +123,7 @@ cmd() {
 				;;
 			-e|--editor)
 				${EDITOR:-vim} $rr_cmd_local
-				file=$rr_cmd_local
+				script=$rr_cmd_local
 				;;
 			*)
 				cmd=$1
@@ -128,7 +132,7 @@ cmd() {
 		shift
 	done
 
-	if [[ -z $cmd ]] && [[ -z $file ]] 
+	if [[ -z $cmd ]] && [[ -z $script ]] 
 	then 
 		error "Must provide either a command string or a file." 
 		exit 1
@@ -139,14 +143,14 @@ cmd() {
 		# the command can either be a file or a bash command.
 		if [[ -f $cmd ]]
 		then
-			file=$cmd
+			script=$cmd
 		else
-			file=$rr_cmd_local
-			echo "$cmd" > $file
+			script=$rr_cmd_local
+			echo "$cmd" > $script
 		fi
 	fi
 
-	if [[ ! -f $file ]]
+	if [[ ! -f $script ]]
 	then
 		error "No file to execute!"
 		exit 1
@@ -158,7 +162,7 @@ cmd() {
 		exit 1
 	fi
 
-	local hosts=$( _host_matchall "${host_regexps[@]}" )
+	local hosts=( $( _host_matchall "${host_regexps[@]}" ) )
 	log_info "Hosts have expanded to: $(array_print "${hosts[@]}")"
 
 	for host in "${hosts[@]}"
@@ -175,7 +179,7 @@ cmd() {
 		_source_key $key
 
 		# execute the script
-		_script_run $host $key_file $file
+		_script_run $host $script $key_file
 
 		) || fail "Error executing cmd on host [$host]."
 	done

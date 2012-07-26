@@ -5,9 +5,9 @@ set +o noglob
 
 rr_tmp_local=${rr_tmp_local:-/tmp}
 rr_tmp_remote=${rr_tmp_remote:-/tmp}
-rr_cmd_sudo=false
+rr_cmd_opts=()
 
-require "local/log.sh"
+require "lib/log.sh"
 require "lib/msg.sh"
 require "lib/msg.sh"
 require "lib/array.sh"
@@ -20,6 +20,11 @@ require "archive.sh"
 if [[ -f $rr_tmp_local/rr.tar ]]
 then
 	rm -f $rr_tmp_local/rr.tar
+fi
+
+if [[ -d $rr_tmp_local/rr ]]
+then
+	rm -rf $rr_tmp_local/rr
 fi
 
 on_exit() {
@@ -48,46 +53,53 @@ _lib_create() {
 			 -C $rr_home			  \
 			 -b rr					  \
 			 require.sh				  \
-			 bin/bashee				  \
 			 bin/griswold			  \
 			 lib					  \
-			 dsl					  \
-			 remote
+			 dsl					  
 
 	# start building the "run" script
 	{
-		echo "set -o errtrace"
-		echo "set -o allexport" 
-		echo 
-
+		# bash options
 		cat -<<-EOH
-			on_error() {
-				echo "Exiting script." 1>&2
-				caller 0					
-				exit 1
-			}
+			set -o errtrace
+			set -o errexit
+			set -o allexport
 
-			trap 'on_error' ERR
-
-			on_exit() {
-				rm -fr $rr_tmp_remote/rr
-				rm -f  $rr_tmp_remote/rr_tmp.tar
-			}
-
-			trap 'on_exit' EXIT INT
+			PATH=\$rr_home/bin:\$PATH
 		EOH
 
-		echo 
-		echo "rr_home=$rr_tmp_remote/rr"
-		echo "rr_home_remote=\$rr_home"
-		echo "rr_pid=$$"
-		echo 
+		# user defined attributes
+		for key in "${!attributes[@]}"
+		do
+			echo "$key=${attributes[$key]}"
+		done
 
-		echo "PATH=\$rr_home/bin:\$PATH"
+		# program defined attributes
+		cat -<<-EOH
+			rr_home=$rr_tmp_remote/rr
+			rr_home_remote=\$rr_home
+			rr_log_level=${rr_log_level:-"INFO"}
+			rr_log_color=${rr_log_color:-"true"}
+			rr_log_local=false
+			rr_log_pid=$rr_log_pid
 
-		echo "source \$rr_home/require.sh"
-		echo 
+			source \$rr_home/require.sh
+		EOH
 
+		# simple error handlers 
+		cat -<<-EOH
+			require "lib/trap.sh"
+
+			on_error() {
+				echo "Exiting script." 1>&2
+				caller 0 1>&2					
+			}
+
+			trap_push 'on_error' ERR
+
+		EOH
+
+		# import all the necessary scripts 
 		for script in $rr_home/lib/*.sh
 		do
 			echo "require \"lib/$(basename $script)\""
@@ -98,23 +110,9 @@ _lib_create() {
 			echo "require \"dsl/$(basename $script)\""
 		done
 
-		for script in $rr_home/remote/*.sh
-		do
-			echo "require \"remote/$(basename $script)\""
-		done
-
 		echo
-
-		for key in "${!attributes[@]}"
-		do
-			echo "$key=${attributes[$key]}"
-		done
-
-		echo "log_level=$log_level"
-
 		echo
 	} | cat - > $rr_tmp_local/run.sh
-
 
 	# add each archive to the library (and add their invocations to the run script)
 	for archive in "${archives[@]}"
@@ -168,17 +166,20 @@ _lib_run() {
 
 	local cmd=$( 
 		cat - <<-CMD
+			on_tmp_exit() {
+				rm -fr $rr_tmp_remote/rr
+				rm -f  $rr_tmp_remote/rr_tmp.tar
+			}
+			
+			trap 'on_tmp_exit' INT EXIT
+
 			tar -pxf $rr_tmp_remote/rr_tmp.tar -C $rr_tmp_remote
-			if $rr_cmd_sudo 
-			then
-				sudo bash $rr_tmp_remote/rr/run.sh
-			else
-				bash $rr_tmp_remote/rr/run.sh
-			fi
+
+			bash $rr_tmp_remote/rr/run.sh
 		CMD
 	)
 
-	ssh -q -t -i $key_file $1 "$cmd"
+	ssh -q -t -i $key_file $host "${rr_cmd_opts[*]} bash -l -c \"$cmd\""
 }
 
 run() {
@@ -193,22 +194,25 @@ run() {
 		case "$arg" in
 			-l|--log-level)
 				shift
-				log_level="$1"
+				rr_log_level="$1"
+				;;
+			--no-color)
+				rr_log_color=false
+				;;
+			-s|--sudo)
+				rr_cmd_opts+=( "sudo" )
 				;;
 			-r|--role)
 				shift
 				tmp_roles+=( "$1" )
 				;;
-			-a|--archives)
+			-a|--archive)
 				shift
 				tmp_archives+=( "$1" )
 				;;
 			-h|--host)
 				shift
 				host_regexps+=( "$1" )
-				;;
-			-s|--sudo)
-				rr_cmd_sudo=true
 				;;
 			*)
 				host_regexps+=( "$1" )
@@ -310,17 +314,19 @@ run_help() {
 
 	printf "%s\n" "
 OPTIONS:
-  -h|--host    The hosts on which to run. 
-  -r|--role    The roles to source.  Multiple may be provived. This 
-			   overrides any roles in the host files.
+  -h|--host       The hosts on which to run. 
+  -r|--role       The roles to source.  Multiple may be provived. This 
+                  overrides any roles in the host files.
 
-  -a|--archive The archive to run.	Multiple may be provided.  This 
-			   overrides any archives in the role files.
+  -a|--archive    The archive to run.  Multiple may be provided.  This 
+                  overrides any archives in the role files.
 
-  -s|--sudo    Execute the runlist as the sudo root user.  If the sudo 
-			   user requires a password, this cannot be daemonized.
+  -s|--sudo       Execute the runlist as the sudo root user.  If the sudo 
+                  user requires a password, this cannot be daemonized.
+  -l|--log-level  Set the local log level.  Can be one of: DEBUG INFO ERROR
+  --no-color      Suppress color output.
+
 "
-	echo 
 }
 
 run_action() {

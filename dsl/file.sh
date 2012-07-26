@@ -59,7 +59,7 @@ file() {
 			fail "Template [$template_src] does not exist in archive [$archive_name]"
 		fi 
 
-		ebash_process_file $template_file > $path
+		ebash_process_file $template_file $path
 
 	elif [[ ! -z $file_src ]]
 	then
