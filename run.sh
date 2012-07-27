@@ -229,7 +229,7 @@ run() {
 		exit 1
 	fi
 
-	local hosts=$( _host_matchall "${host_regexps[@]}" )
+	local hosts=( $( _host_matchall "${host_regexps[@]}" ) )
 	log_info "Hosts have expanded to: $(array_print "${hosts[@]}")"
 
 	for host in "${hosts[@]}"

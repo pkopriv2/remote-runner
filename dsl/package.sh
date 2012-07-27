@@ -1,6 +1,5 @@
 #! /bin/bash
 
-
 # Installs the specified package.
 package() {	
 	log_info "Processing package [$1]"
@@ -10,7 +9,7 @@ package() {
 		action=$1
 	}
 
-	. /dev/stdin
+	source /dev/stdin
 
 	unset -f action
 	package_"$action" $1
