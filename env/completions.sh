@@ -1,7 +1,4 @@
-export rr_home=${rr_home:-$HOME/.rr}
-export rr_host_home=${rr_host_home:-$rr_home/hosts}
-export rr_archive_home=${rr_archive_home:-$rr_home/archives}
-export rr_role_home=${rr_role_home:-$rr_home/roles}
+rr_home=${rr_home:-$HOME/.rr}
 
 _rrcd_complete() {
 	local cur=${COMP_WORDS[COMP_CWORD]}
@@ -11,7 +8,7 @@ _rrcd_complete() {
 
 	case "$prev" in
 		rrcd) 
-			local archives=( $(builtin cd "$rr_archive_home" ; find . -maxdepth 1 -mindepth 1 | sed 's|^\.\/||' | sort ) )
+			local archives=( $(builtin cd "${rr_archive_home:-$rr_home/archives}" ; find . -maxdepth 1 -mindepth 1 | sed 's|^\.\/||' | sort ) )
 			COMPREPLY=( $( compgen -W "${archives[@]}" -- $cur ) )
 			;;
 	esac
@@ -34,7 +31,7 @@ _rr_complete() {
 
 	case "$cmd" in
 		"") 
-			local hosts=($(builtin cd "$rr_host_home" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
+			local hosts=($(builtin cd "${rr_host_home:-$rr_home/hosts}" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
 			COMPREPLY=( $( compgen -W '${hosts[@]} archive host key role' -- $cur ) )
 			;;
 		#:rr:-) 
@@ -44,28 +41,28 @@ _rr_complete() {
 			COMPREPLY=( $( compgen -W 'create delete install list' -- $cur ) )
 			;;
 		:archive:delete)
-			local archives=( $(builtin cd "$rr_archive_home" ; find . -maxdepth 1 -mindepth 1 | sed 's|^\.\/||' | sort ) )
+			local archives=( $(builtin cd "${rr_archive_home:-$rr_home/archives}" ; find . -maxdepth 1 -mindepth 1 | sed 's|^\.\/||' | sort ) )
 			COMPREPLY=( $( compgen -W '${archives[@]}' -- $cur ) )
 			;;
 		:host)
 			COMPREPLY=( $( compgen -W 'show list edit bootstrap' -- $cur ) )
 			;;
 		:host:show|:host:edit)
-			local hosts=($(builtin cd "$rr_host_home" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
+			local hosts=($(builtin cd "${rr_host_home:-$rr_home/hosts}" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
 			COMPREPLY=( $( compgen -W '${hosts[@]}' -- $cur ) )
 			;;
 		:key)
 			COMPREPLY=( $( compgen -W 'create delete list show' -- $cur ) )
 			;;
 		:key:show|:key:delete)
-			local keys=($(builtin cd "$rr_key_home" ; find . -maxdepth 1 -mindepth 1 -name 'id_rsa.*.pub' -print | sed 's|\.\/id_rsa\.\([^\.]*\)\.pub|\1|' | sort ))
+			local keys=($(builtin cd "${rr_key_home:-$rr_home/keys}" ; find . -maxdepth 1 -mindepth 1 -name 'id_rsa.*.pub' -print | sed 's|\.\/id_rsa\.\([^\.]*\)\.pub|\1|' | sort ))
 			COMPREPLY=( $( compgen -W '${keys[@]}' -- $cur ) )
 			;;
 		:role)
 			COMPREPLY=( $( compgen -W 'create delete list show edit' -- $cur ) )
 			;;
 		:role:show|:role:delete|:role:edit)
-			local roles=($(builtin cd "$rr_role_home" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
+			local roles=($(builtin cd "${rr_role_home:-$rr_home/roles}" ; find . -maxdepth 1 -mindepth 1 -name '*.sh' -print | sed 's|\.\/||' | sed 's|\.sh||' | sort ))
 			COMPREPLY=( $( compgen -W '${roles[@]}' -- $cur ) )
 			;;
 	esac

@@ -33,25 +33,34 @@ then
 	exit 1
 else
 	info "Installing as $USER."
-	rr_home=${rr_home:-"~/.rr"}
-	rr_install_dir=${rr_install_dir:-"~"}
-	rr_profile=~/.profile
+
+	cmd=$(
+		cat - <<-EOH
+			rr_home=~/.rr
+			rr_profile=~/.profile
+		EOH
+	)
+
+	eval "$cmd"
 fi
 
-rr_file_tmp=${rr_file_tmp:-"/tmp/rr.tar"}
-rr_file_remote=${rr_file_remote:-"http://github.com/pkopriv2/download/remote-runner-$version.tar.gz"}
+rr_file_tmp=${rr_file_tmp:-/tmp/rr.tar}
+rr_file_remote=${rr_file_remote:-"https://github.com/downloads/pkopriv2/remote-runner/remote-runner-$version.tar.gz"}
 
-if ! wget --progress=bar -O $rr_file_tmp $rr_file_remote
+if ! wget -q -O $rr_file_tmp $rr_file_remote
 then
-	error "Error downloading remote runner [$rr_file_remote].  Either cannot download or cannot write to file [$rr_tmp_file]"
+	error "Error downloading remote runner [$rr_file_remote].  Either cannot download or cannot write to file [$rr_file_tmp]"
 	exit 1
 fi
 
-if ! tar -xf $rr_tmp_file -C $rr_install_dir
+if ! tar -xf $rr_file_tmp -C /tmp
 then
 	error "Error unpackaging tmp file [$rr_tmp_file]"
 	exit 1
-fi
+fi 
+
+info "Installing to home: $rr_home" 
+mv /tmp/rr $rr_home
 
 if ! grep -q "rr_home=$rr_home" $rr_profile
 then
@@ -69,4 +78,4 @@ source $rr_home/env.sh
 	fi
 fi
 
-info "Successfully installed remote-runner!  Please resource your environment for changes to take effect."
+info "Successfully installed remote-runner!  Please source your environment for changes to take effect."
