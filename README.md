@@ -19,42 +19,43 @@ system - only SSH is required and a base Posix compliant system!
 # Usage
 
 1. Create an ssh public/private key pair.
-	
-	rr key create home
+    
+    rr key create home
 
 2. Bootstrap a host with the key.
 
-	rr host boostrap root@localhost home
+    rr host boostrap root@localhost home
 
 3. Create an archive (This is a repo for remote scripts)
 
-	pushd ~
-	rr archive create test
-	rr archive install test
-	popd
+    pushd ~
+    rr archive create test
+    rr archive install test
+    popd
 
 4. Edit the archive
 
-	rrcd test
-	cat - > scripts/default.sh <<-EOF
-	log_info "Hello, world.  I am on \$HOSTNAME!"
+    rrcd test
+    cat - > scripts/default.sh <<-EOF
+    log_info "Hello, world.  I am on \$HOSTNAME!"
 
-	file "~/test.txt"<<-FILE
-		contents "hello, world"
-	FILE
-	EOF
+    file "~/test.txt"<<-FILE
+        contents "hello, world"
+    FILE
+    EOF
 
 5. Run the archive!
 
-	rrr --host root@localhost --archive test 
+    rrr --host root@localhost --archive test 
 
 # Installation
 
 * Install the current version.
-	
-	curl http://github.cerner.com/pkopriv2/remote-runner/release_v1/install.sh | bash -s 
+    
+    curl https://raw.github.com/pkopriv2/remote-runner/master/install.sh | bash -s 
 
 * Install a specific version.
 
-	curl http://github.cerner.com/pkopriv2/remote-runner/release_v1/install.sh | bash -s "1.0.1"
+    curl https://raw.github.com/pkopriv2/remote-runner/master/install.sh | bash -s "1.0.1"
+
 
