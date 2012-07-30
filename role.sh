@@ -188,6 +188,9 @@ role_list() {
 	done
 }
 
+role_home() {
+	info "Role home: $rr_role_home"
+}
 
 role_help() {
 	info "** Role Commands **"
@@ -215,7 +218,7 @@ role_action() {
 	unset args[0]
 
 	case "$action" in
-		list|show|create|delete|edit|install)
+		list|show|create|delete|edit|install|home)
 			role_$action "${args[@]}"
 			;;
 		*)

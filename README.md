@@ -16,6 +16,16 @@ system - only SSH is required and a base Posix compliant system!
 * *rrr* - An alias to "rr run". 
 * *griswold* - A tar wrapper that facilitates in the packaging of files.
 
+# Installation
+
+* Install the current version.
+    
+    curl https://raw.github.com/pkopriv2/remote-runner/master/install.sh | bash -s 
+
+* Install a specific version.
+
+    curl https://raw.github.com/pkopriv2/remote-runner/master/install.sh | bash -s "1.0.1"
+
 # Usage
 
 1. Create an ssh public/private key pair.
@@ -48,14 +58,7 @@ system - only SSH is required and a base Posix compliant system!
 
     rrr --host root@localhost --archive test 
 
-# Installation
+# 
 
-* Install the current version.
-    
-    curl https://raw.github.com/pkopriv2/remote-runner/master/install.sh | bash -s 
-
-* Install a specific version.
-
-    curl https://raw.github.com/pkopriv2/remote-runner/master/install.sh | bash -s "1.0.1"
 
 

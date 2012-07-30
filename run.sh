@@ -334,7 +334,7 @@ run_action() {
 	action="${args[0]}"
 
 	case "$action" in
-		help)
+		help|--help|-h)
 			run_help --detailed
 			;;
 		*)

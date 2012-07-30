@@ -1,6 +1,7 @@
 #! /bin/bash
 
 rr_home=${rr_home:-$HOME/.rr}
+rr_archive_home=${rr_archive_home:-$HOME/.rr/archives}
 
 source $rr_home/require.sh
 

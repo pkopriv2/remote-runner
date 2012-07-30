@@ -190,7 +190,7 @@ cmd_action() {
 	action="${args[0]}"
 
 	case "$action" in
-		help)
+		help|--help|-h)
 			cmd_help --detailed
 			;;
 		*)

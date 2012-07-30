@@ -1,5 +1,11 @@
 #! /bin/bash
 
+require "lib/inode.sh"
+
+require "dsl/includes/on_change.sh"
+require "dsl/includes/on_condition.sh"
+require "dsl/includes/on_error.sh"
+
 directory() {
 	if [[ -z $1 ]]
 	then
@@ -13,7 +19,7 @@ directory() {
 		owner=$1
 	}
 
-	local group="$USER"
+	local group="$(user_get_primary_group $USER)"
 	group() {
 		group=$1
 	}
@@ -23,14 +29,59 @@ directory() {
 		permissions=$1
 	}
 
-	if ! test -t 0
+	# expand the path (a string isn't necessary a path)
+	eval "local path=$1"
+
+	# grab the std in.
+	local block=$(cat -)
+	eval "$block"
+
+	if ! on_condition_func 
 	then
-		source /dev/stdin
+		log_debug "Condition function not satisfied."
+		return 0
 	fi
 
-	eval "path=$1"
-	if ! su $owner -c "mkdir -p $path 1> /dev/null"
+	log_debug "Ensuring directory [$path] has ownership [$owner:$group] and permissions [$permissions]"
+
+	local updated=false
+	if [[ ! -d $path  ]] 
 	then
-		fail "Error creating directory [$path]"
+		log_debug "That directory [$path] doesn't exist."
+		if ! mkdir -p $mkdir -p $path 1> /dev/null
+		then
+			fail "Error creating directory [$path]"
+		fi 
+
+		local updated=true
+	fi 
+
+	if ! inode_has_owner? $path $owner || ! inode_has_group? $path $group 
+	then
+		log_debug "That directory [$path] has different ownership."
+		if ! chown $owner:$group $path 1>/dev/null 
+		then
+			fail "Error setting ownership [$owner:$group] of directory [$path]"
+		fi 
+
+		local updated=true
 	fi
+
+	if ! inode_has_permissions? $path $permissions
+	then
+		log_debug "That directory [$path] has different permissions."
+		if ! chmod $permissions $path 1>/dev/null 
+		then
+			fail "Error setting permissions [$permissions] of directory [$path]"
+		fi
+
+		local updated=true
+	fi
+
+	if $updated
+	then
+		on_change_func 
+	fi
+
+	log_debug "Successfully created directory [$path]"
 }

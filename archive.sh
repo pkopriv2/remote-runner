@@ -154,6 +154,9 @@ _archive_list() {
 	done
 }
 
+archive_home() {
+	info "Archive home: $rr_archive_home"
+}
 
 archive_help() {
 	info "** Archive Commands **"
@@ -196,7 +199,7 @@ archive_action() {
 	unset args[0]
 
 	case "$action" in
-		list|listl|show|create|delete|edit|install)
+		list|listl|show|create|delete|edit|install|home)
 			archive_$action "${args[@]}"
 			;;
 		*)

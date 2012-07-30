@@ -111,6 +111,10 @@ key_list() {
 	done
 }
 
+key_home() {
+	info "Key home: $rr_key_home"
+}
+
 
 key_help() {
 	info "** Key Commands **"
@@ -138,7 +142,7 @@ key_action() {
 	unset args[0]
 
 	case "$action" in
-		list|show|create|delete)
+		list|show|create|delete|home)
 			key_$action "${args[@]}"
 			;;
 		*)

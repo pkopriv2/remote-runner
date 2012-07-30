@@ -22,7 +22,7 @@ file() {
 
 	declare contents
 	contents() {
-		if ! test -t 0
+		if [[ -z $1 ]] 
 		then
 			contents=$(cat -)
 			return 0 
@@ -31,26 +31,7 @@ file() {
 		contents="$1"
 	}
 
-	declare template_src
 	template() {
-		template_src="$1"
-	}
-
-	declare file_src
-	src() {
-		file_src="$1"
-	}
-
-	if ! test -t 0
-	then
-		. /dev/stdin
-	fi
-
-	eval "path=$1"
-	log_debug "Path has expanded to: $path"
-
-	if [[ ! -z $template_src ]]
-	then
 		log_debug "Creating file [$1] from template: $template_src"
 
 		local template_file=$rr_home_remote/archives/$archive_name/templates/$template_src 
@@ -59,10 +40,10 @@ file() {
 			fail "Template [$template_src] does not exist in archive [$archive_name]"
 		fi 
 
-		ebash_process_file $template_file $path
+		contents=$(ebash_process_file $template_file $path) 
+	}
 
-	elif [[ ! -z $file_src ]]
-	then
+	src() {
 		log_debug "Creating file [$1] from archive file: $file_src"
 
 		local file=$rr_home_remote/archives/$archive_name/files/$file_src
@@ -71,28 +52,62 @@ file() {
 			fail "Archive file [$file_src] does not exist in archive [$archive_name]"
 		fi 
 
-		cp $file $path || fail "Error creating file: $path"
+		local contents=$(cat $file) 
+	}
 
+	eval "local path=$1"
+
+	# grab the std in.
+	local block=$(cat -)
+	eval "$block"
+
+	if ! on_condition_func 
+	then
+		log_debug "Condition function not satisfied."
+		return 0
+	fi
+
+	if [[ -f $path ]]
+	then
+		local cur_contents=$(cat $path)
 	else
-		log_debug "Processing file from contents."
+		local cur_contents=""
+	fi
+
+	local cur_hash=$(echo "$cur_contents" | md5sum | awk '{print $1}')
+	local new_hash=$(echo "$contents" | md5sum | awk '{print $1}')
+
+	if [[ "$cur_hash" != "$new_hash" ]]
+	then
+		log_debug "New hash [$new_hash] differs from current hash [$cur_hash]"
 		echo "$contents" > $path
+		local updated=true
 	fi
 
-	if ! touch $path 1> /dev/null
+	if ! inode_has_owner? $path $owner || ! inode_has_group? $path $group 
 	then
-		log_error "Error creating file [$path]"
-		exit 1
+		log_debug "That directory [$path] has different ownership."
+		if ! chown $owner:$group $path 1>/dev/null 
+		then
+			fail "Error setting ownership [$owner:$group] of directory [$path]"
+		fi 
+
+		local updated=true
 	fi
 
-	if ! chown $owner:$group $path 
+	if ! inode_has_permissions? $path $permissions
 	then
-		log_error "Error setting ownership of file [$path]" 
-		exit 1
+		log_debug "That directory [$path] has different permissions."
+		if ! chmod $permissions $path 1>/dev/null 
+		then
+			fail "Error setting permissions [$permissions] of directory [$path]"
+		fi
+
+		local updated=true
 	fi
 
-	if ! chmod $permissions $path
+	if $updated
 	then
-		log_error "Error setting permissions of file [$path]"
-		exit 1
+		on_change_func 
 	fi
 }

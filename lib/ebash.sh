@@ -6,19 +6,24 @@ set -o errtrace
 require "lib/msg.sh"
 require "lib/trap.sh"
 
+# Processes an embedded bash file (*.esh) and if successful, prints
+# the outputs to standard out.
+# 
+# $1 - The esh file.
+#
 ebash_process_file() {
 	if [[ -z $1 ]] 
 	then
 		fail "Must provide a ebash file."
 	fi 
 
-	file=$1
+	local file=$1
 	if [[ ! -f $file ]] 
 	then
 		fail "Must provide a ebash file."
 	fi 
 
-	tmp_file=/tmp/ebash.tmp
+	local tmp_file=/tmp/ebash.tmp
 	if ! touch $tmp_file &> /dev/null
 	then
 		fail "Must provide a ebash file."
@@ -94,7 +99,7 @@ ebash_process_file() {
 	trap_pop ERR
 	trap_push "ebash_on_template_error" ERR
 
-	source $tmp_file > $2
+	source $tmp_file
 
 	trap_pop ERR
 	

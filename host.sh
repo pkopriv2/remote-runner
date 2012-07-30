@@ -230,6 +230,10 @@ host_edit() {
 	${EDITOR:-vim} $rr_host_home/$login.sh
 }
 
+host_home() {
+	info "Host home: $rr_host_home"
+}
+
 host_help() {
 	info "** Host Commands **"
 	echo 
@@ -254,7 +258,7 @@ host_action() {
 	unset args[0]
 
 	case "$action" in
-		list|bootstrap|show|edit)
+		list|bootstrap|show|edit|home)
 			host_$action "${args[@]}"
 			;;
 		*)

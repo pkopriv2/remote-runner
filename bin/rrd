@@ -104,7 +104,7 @@ case "$action" in
 	list|killall)
 		rrd_$action "${@}"
 		;;
-	help)
+	help|--help|-h)
 		rrd_help
 		;;	
 	*)
