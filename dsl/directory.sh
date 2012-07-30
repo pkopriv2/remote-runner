@@ -1,10 +1,7 @@
 #! /bin/bash
 
 require "lib/inode.sh"
-
-require "dsl/includes/on_change.sh"
-require "dsl/includes/on_condition.sh"
-require "dsl/includes/on_error.sh"
+require "dsl/includes/callbacks.sh"
 
 directory() {
 	if [[ -z $1 ]]
@@ -36,7 +33,7 @@ directory() {
 	local block=$(cat -)
 	eval "$block"
 
-	if ! on_condition_func 
+	if ! callback_on_condition
 	then
 		log_debug "Condition function not satisfied."
 		return 0
@@ -80,8 +77,9 @@ directory() {
 
 	if $updated
 	then
-		on_change_func 
+		callback_on_change 
 	fi
 
-	log_debug "Successfully created directory [$path]"
+	callback_on_success
+
 }

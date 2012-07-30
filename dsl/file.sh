@@ -1,6 +1,7 @@
 #! /bin/bash
 
 require "lib/ebash.sh"
+require "dsl/includes/callbacks.sh"
 
 file() {
 	log_info "Creating file [$1]"
@@ -31,7 +32,31 @@ file() {
 		contents="$1"
 	}
 
+	declare template_src
 	template() {
+		template_src=$1
+	}
+
+	declare files_src
+	src() {
+		file_src=$1
+		
+	}
+
+	eval "local path=$1"
+
+	# grab the std in.
+	local block=$(cat -)
+	eval "$block"
+
+	if ! callback_on_condition
+	then
+		log_debug "Condition function not satisfied."
+		return 0
+	fi
+
+	if [[ ! -z $template_src ]]
+	then
 		log_debug "Creating file [$1] from template: $template_src"
 
 		local template_file=$rr_home_remote/archives/$archive_name/templates/$template_src 
@@ -41,9 +66,10 @@ file() {
 		fi 
 
 		contents=$(ebash_process_file $template_file $path) 
-	}
+	fi
 
-	src() {
+	if [[ ! -z $file_src ]]
+	then
 		log_debug "Creating file [$1] from archive file: $file_src"
 
 		local file=$rr_home_remote/archives/$archive_name/files/$file_src
@@ -52,21 +78,10 @@ file() {
 			fail "Archive file [$file_src] does not exist in archive [$archive_name]"
 		fi 
 
-		local contents=$(cat $file) 
-	}
-
-	eval "local path=$1"
-
-	# grab the std in.
-	local block=$(cat -)
-	eval "$block"
-
-	if ! on_condition_func 
-	then
-		log_debug "Condition function not satisfied."
-		return 0
+		contents=$(cat $file) 
 	fi
 
+	local updated=false
 	if [[ -f $path ]]
 	then
 		local cur_contents=$(cat $path)
@@ -86,10 +101,10 @@ file() {
 
 	if ! inode_has_owner? $path $owner || ! inode_has_group? $path $group 
 	then
-		log_debug "That directory [$path] has different ownership."
+		log_debug "That file [$path] has different ownership."
 		if ! chown $owner:$group $path 1>/dev/null 
 		then
-			fail "Error setting ownership [$owner:$group] of directory [$path]"
+			fail "Error setting ownership [$owner:$group] of file [$path]"
 		fi 
 
 		local updated=true
@@ -97,10 +112,10 @@ file() {
 
 	if ! inode_has_permissions? $path $permissions
 	then
-		log_debug "That directory [$path] has different permissions."
+		log_debug "That file [$path] has different permissions."
 		if ! chmod $permissions $path 1>/dev/null 
 		then
-			fail "Error setting permissions [$permissions] of directory [$path]"
+			fail "Error setting permissions [$permissions] of file [$path]"
 		fi
 
 		local updated=true
@@ -108,6 +123,9 @@ file() {
 
 	if $updated
 	then
-		on_change_func 
+
+		callback_on_change
 	fi
+
+	callback_on_success
 }
