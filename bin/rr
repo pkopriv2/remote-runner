@@ -18,7 +18,7 @@ help() {
 	local subcommands=( run cmd key host role archive )
 	for cmd in "${subcommands[@]}" 
 	do
-		require "$cmd.sh" 
+		require "scripts/$cmd.sh" 
 		"$cmd"_help "${@}"
 		echo 
 	done
@@ -30,7 +30,7 @@ shift
 
 case "$action" in
 	key|host|role|archive|run|cmd)
-		require "$action.sh" 
+		require "scripts/$action.sh" 
 
 		"$action"_action "${@}"
 		;;

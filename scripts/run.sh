@@ -3,33 +3,34 @@
 set -o errtrace
 set +o noglob 
 
-rr_tmp_local=${rr_tmp_local:-/tmp}
-rr_tmp_remote=${rr_tmp_remote:-/tmp}
-rr_cmd_opts=()
-
 require "lib/log.sh"
 require "lib/msg.sh"
-require "lib/msg.sh"
 require "lib/array.sh"
+require "lib/string.sh"
 
-require "host.sh"
-require "key.sh"
-require "role.sh"
-require "archive.sh"
+require "scripts/host.sh"
+require "scripts/key.sh"
+require "scripts/role.sh"
+require "scripts/archive.sh"
 
-if [[ -f $rr_tmp_local/rr.tar ]]
+rr_local_dir=${rr_local_dir:-/tmp}
+rr_local_base=rr_$(str_random)
+rr_local_tmp=$rr_local_dir/$rr_local_base
+
+rr_remote_dir=${rr_remote_dir:-/tmp}
+rr_remote_base=rr_$(str_random)
+rr_remote_tmp=$rr_remote_dir/$rr_remote_base
+rr_remote_tar=$rr_remote_dir/rr.tar.$(str_random)
+
+rr_cmd_opts=()
+
+if [[ ! -d $rr_local_tmp ]]
 then
-	rm -f $rr_tmp_local/rr.tar
-fi
-
-if [[ -d $rr_tmp_local/rr ]]
-then
-	rm -rf $rr_tmp_local/rr
+	mkdir -p $rr_local_tmp
 fi
 
 on_exit() {
-	rm -f $rr_tmp_local/rr.tar
-	rm -f $rr_tmp_local/run.sh
+	rm -r $rr_local_tmp
 }
 
 trap 'on_exit' EXIT INT
@@ -49,7 +50,7 @@ _lib_create() {
 	log_info "Building archive library from archives: $(array_print ${archives[@]})"
 
 	# add the standard library files.
-	griswold -o $rr_tmp_local/rr.tar  \
+	griswold -o $rr_local_tmp/rr.tar  \
 			 -C $rr_home			  \
 			 -b rr					  \
 			 require.sh				  \
@@ -76,7 +77,7 @@ _lib_create() {
 
 		# program defined attributes
 		cat -<<-EOH
-			rr_home=$rr_tmp_remote/rr
+			rr_home=$rr_remote_tmp/rr
 			rr_home_remote=\$rr_home
 			rr_log_level=${rr_log_level:-"INFO"}
 			rr_log_color=${rr_log_color:-"true"}
@@ -92,7 +93,7 @@ _lib_create() {
 
 			on_error() {
 				echo "Exiting script." 1>&2
-				caller 0 1>&2					
+				caller 0 1>&2
 			}
 
 			trap_push 'on_error' ERR
@@ -112,7 +113,7 @@ _lib_create() {
 
 		echo
 		echo
-	} | cat - > $rr_tmp_local/run.sh
+	} | cat - > $rr_local_tmp/run.sh
 
 	# add each archive to the library (and add their invocations to the run script)
 	for archive in "${archives[@]}"
@@ -131,11 +132,11 @@ _lib_create() {
 			fail "Unable to locate archive script [$archive_script]"
 		fi
 
-		if ! tar -tf $rr_tmp_local/rr.tar | grep -q "archives\/$archive_name"
+		if ! tar -tf $rr_local_tmp/rr.tar | grep -q "archives\/$archive_name"
 		then
 			log_debug "The archive [$archive_name] has not been added."
 
-			griswold -o $rr_tmp_local/rr.tar  \
+			griswold -o $rr_local_tmp/rr.tar  \
 					 -c $rr_archive_home	  \
 					 -b rr/archives			  \
 					 $archive_name					
@@ -144,15 +145,15 @@ _lib_create() {
 		{
 			echo "archive_name=$archive_name"
 			echo "source \$rr_home/archives/$archive_name/scripts/$archive_script.sh"
-		} | cat ->> $rr_tmp_local/run.sh
+		} | cat ->> $rr_local_tmp/run.sh
 	done
 
-	griswold -o $rr_tmp_local/rr.tar  \
-			 -c $rr_tmp_local		  \
+	griswold -o $rr_local_tmp/rr.tar  \
+			 -c $rr_local_tmp		  \
 			 -b rr					  \
 			 run.sh
 
-	rm -f $rr_tmp_local/run.sh
+	rm -f $rr_local_tmp/run.sh
 }
 
 _lib_run() {
@@ -161,21 +162,26 @@ _lib_run() {
 
 	log_info "Executing runlist on host [$host]"
 
-	scp -i $key_file $rr_tmp_local/rr.tar $host:$rr_tmp_remote/rr_tmp.tar &> /dev/null ||
+	scp -i $key_file $rr_local_tmp/rr.tar $host:$rr_remote_tar &> /dev/null ||
 		fail "Error transferring library to host [$host]"
 
 	local cmd=$( 
 		cat - <<-CMD
+			if [[ ! -d $rr_remote_tmp ]]
+			then
+				mkdir -p $rr_remote_tmp	
+			fi
+
 			on_tmp_exit() {
-				rm -fr $rr_tmp_remote/rr
-				rm -f  $rr_tmp_remote/rr_tmp.tar
+				rm -f $rr_remote_tar
+				rm -r $rr_remote_tmp
 			}
 			
 			trap 'on_tmp_exit' INT EXIT
 
-			tar -pxf $rr_tmp_remote/rr_tmp.tar -C $rr_tmp_remote
+			tar -pxf $rr_remote_tar -C $rr_remote_tmp
 
-			bash $rr_tmp_remote/rr/run.sh
+			bash $rr_remote_tmp/rr/run.sh
 		CMD
 	)
 
@@ -314,17 +320,17 @@ run_help() {
 
 	printf "%s\n" "
 OPTIONS:
-  -h|--host       The hosts on which to run. 
-  -r|--role       The roles to source.  Multiple may be provived. This 
-                  overrides any roles in the host files.
+  -h|--host		  The hosts on which to run. 
+  -r|--role		  The roles to source.	Multiple may be provived. This 
+				  overrides any roles in the host files.
 
-  -a|--archive    The archive to run.  Multiple may be provided.  This 
-                  overrides any archives in the role files.
+  -a|--archive	  The archive to run.  Multiple may be provided.  This 
+				  overrides any archives in the role files.
 
-  -s|--sudo       Execute the runlist as the sudo root user.  If the sudo 
-                  user requires a password, this cannot be daemonized.
-  -l|--log-level  Set the local log level.  Can be one of: DEBUG INFO ERROR
-  --no-color      Suppress color output.
+  -s|--sudo		  Execute the runlist as the sudo root user.  If the sudo 
+				  user requires a password, this cannot be daemonized.
+  -l|--log-level  Set the local log level.	Can be one of: DEBUG INFO ERROR
+  --no-color	  Suppress color output.
 
 "
 }

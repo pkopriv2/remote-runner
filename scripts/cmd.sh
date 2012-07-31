@@ -11,13 +11,13 @@ require "lib/array.sh"
 require "lib/string.sh"
 require "lib/login.sh"
 
-require "host.sh"
-require "key.sh"
+require "scripts/host.sh"
+require "scripts/key.sh"
 
 rr_tmp_local=${rr_tmp_local:-/tmp}
 rr_tmp_remote=${rr_tmp_remote:-/tmp}
-rr_remote_file=${rr_remote_file:-$rr_tmp_remote/rr_remote_cmd.tmp}
-rr_cmd_local=${rr_cmd_loca:-$rr_tmp_local/rr_cmd}
+rr_remote_file=${rr_remote_file:-$rr_tmp_remote/rr_remote_cmd.tmp.$(str_random)}
+rr_cmd_local=${rr_cmd_loca:-$rr_tmp_local/rr_cmd.tmp.$(str_random)}
 rr_cmd_opts=()
 rr_source=true
 
@@ -70,7 +70,7 @@ _script_run() {
 	local cmd=$( 
 		cat - <<-OUTERCMD
 			on_tmp_exit() {
-				rm $rr_remote_file
+				rm -f $rr_remote_file
 			}
 
 			trap 'on_tmp_exit' INT EXIT

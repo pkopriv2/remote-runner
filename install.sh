@@ -62,7 +62,7 @@ then
 fi 
 
 info "Installing to home: $rr_home" 
-if ! mv /tmp/remote-runner $rr_home
+if ! mv /tmp/remote-runner-$version $rr_home
 then
 	error "Error unpackaging tmp file [$rr_tmp_file]"
 	exit 1

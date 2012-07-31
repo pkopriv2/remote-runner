@@ -4,7 +4,7 @@ require "lib/login.sh"
 require "lib/user.sh"
 require "lib/host.sh"
 require "lib/msg.sh"
-require "key.sh"
+require "scripts/key.sh"
 
 rr_host_home=${rr_host_home:-$rr_home/hosts}
 dir_create_if_missing "$rr_host_home"
