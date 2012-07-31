@@ -19,18 +19,38 @@ error() {
 }
 
 version=$(cat $rr_home/project.txt | awk '{print $2;}')
+while [[ $# -gt 0 ]]
+do
+	arg="$1"
+
+	case "$arg" in
+		-l|--latest)
+			version="latest"
+			;;
+		*)
+			error "That option is not allowed" 
+			;;
+	esac
+	shift
+done
 
 info "Packaging version: $version" 
 
 mkdir -p $rr_home/target
 
-griswold -o $rr_home/target/remote-runner-$version.tar.gz \
-         -c $rr_home                                      \
-		 -b remote-runner                                 \
-		  bin                                             \
-		  dsl                                             \
-		  env                                             \
-		  lib                                             \
-		  scripts                                         \
-		  env.sh                                          \
-		  require.sh                                      
+out=$rr_home/target/remote-runner-$version.tar
+if [[ -f $out ]] 
+then
+	rm -f $out
+fi
+
+griswold -o $out                     \
+		 -c $rr_home                 \
+		 -b remote-runner-$version   \
+		  bin                        \
+		  dsl                        \
+		  env                        \
+		  lib                        \
+		  scripts                    \
+		  env.sh                     \
+		  require.sh                                       

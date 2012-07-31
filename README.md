@@ -24,7 +24,7 @@ system - only SSH is required and a base Posix compliant system!
 
 * Install a specific version.
 
-	curl https://raw.github.com/pkopriv2/remote-runner/master/install.sh | bash -s "1.0.1"
+	curl https://raw.github.com/pkopriv2/remote-runner/master/install.sh | bash -s "1.0.0"
 
 # Usage
 

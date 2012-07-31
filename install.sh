@@ -44,8 +44,8 @@ else
 	eval "$cmd"
 fi
 
-rr_file_tmp=${rr_file_tmp:-/tmp/remote-runner.tar}
-rr_file_remote=${rr_file_remote:-"https://github.com/downloads/pkopriv2/remote-runner/remote-runner-$version.tar.gz"}
+rr_file_tmp=${rr_file_tmp:-/tmp/remote-runner-$version.tar}
+rr_file_remote=${rr_file_remote:-"https://github.com/downloads/pkopriv2/remote-runner/remote-runner-$version.tar"}
 
 info "Downloading remote-runner."
 if ! wget -q -O $rr_file_tmp $rr_file_remote
@@ -64,7 +64,7 @@ fi
 info "Installing to home: $rr_home" 
 if ! mv /tmp/remote-runner-$version $rr_home
 then
-	error "Error unpackaging tmp file [$rr_tmp_file]"
+	error "Error moving /tmp/remote-runner-$version to $rr_home"
 	exit 1
 fi 
 
